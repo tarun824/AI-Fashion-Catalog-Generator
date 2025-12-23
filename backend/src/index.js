@@ -9,7 +9,15 @@ dotenv.config();
 const app = express();
 const port = process.env.PORT || 5000;
 
-app.use(cors({ origin: true }));
+app.use(
+  cors({
+    origin: [
+      "ai-fashion-catalog-generator-tfec.vercel.app",
+      "http://localhost:5174",
+    ],
+    credentials: true,
+  })
+);
 app.use(
   express.json({
     limit: "10mb",
