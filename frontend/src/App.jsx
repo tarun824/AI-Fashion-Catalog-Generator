@@ -1,128 +1,243 @@
-import { useEffect, useRef, useState } from "react";
-import ImageUploader from "./components/ImageUploader";
-import ResultCard from "./components/ResultCard";
+import { useEffect, useMemo, useRef, useState } from "react";
+import BatchUploader from "./components/BatchUploader";
+import ProgressPanel from "./components/ProgressPanel";
+import ResultsPanel from "./components/ResultsPanel";
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:5000";
-
+const API_BASE_URL = (
+  import.meta.env.VITE_API_BASE_URL ?? "http://localhost:5000"
+).replace(/\/$/, "");
+const MAX_FILES = 200;
 const HERO_COPY = {
   title: "AI Fashion Catalog Generator",
   subtitle:
-    "Upload any garment photo and instantly receive a polished, storefront-ready specification crafted by GPT-4o vision.",
+    "Upload up to 200 garments per batch, watch progress live, and export polished catalog copy in Excel.",
 };
 
-const convertToBase64 = (file) =>
-  new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      const result = reader.result?.toString() ?? "";
-      const [, base64String] = result.split("base64,");
-      if (!base64String) {
-        reject(new Error("Unable to parse file contents."));
-        return;
-      }
-      resolve(base64String);
-    };
-    reader.onerror = () => reject(new Error("Unable to read the file."));
-    reader.readAsDataURL(file);
-  });
+const createClientId = () =>
+  typeof crypto !== "undefined" && crypto.randomUUID
+    ? crypto.randomUUID()
+    : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+
+const formatFileSize = (bytes) => {
+  if (!bytes) return "0 B";
+  const units = ["B", "KB", "MB", "GB"];
+  const index = Math.min(
+    Math.floor(Math.log(bytes) / Math.log(1024)),
+    units.length - 1
+  );
+  return `${(bytes / 1024 ** index).toFixed(index === 0 ? 0 : 1)} ${
+    units[index]
+  }`;
+};
+
+const terminalStatuses = new Set([
+  "completed",
+  "completed_with_errors",
+  "failed",
+]);
 
 function App() {
-  const [imageBase64, setImageBase64] = useState("");
-  const [previewUrl, setPreviewUrl] = useState("");
-  const [description, setDescription] = useState("");
+  const [files, setFiles] = useState([]);
+  const [jobSummary, setJobSummary] = useState(null);
+  const [downloadUrl, setDownloadUrl] = useState("");
   const [error, setError] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
+  const [infoMessage, setInfoMessage] = useState("");
+  const [isUploading, setIsUploading] = useState(false);
 
-  const lastPreviewRef = useRef("");
+  const eventSourceRef = useRef(null);
+  const pollIntervalRef = useRef(null);
+
   useEffect(
     () => () => {
-      if (lastPreviewRef.current) {
-        URL.revokeObjectURL(lastPreviewRef.current);
+      eventSourceRef.current?.close();
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current);
       }
     },
-    [],
+    []
   );
 
-  const updatePreview = (nextUrl) => {
-    if (lastPreviewRef.current) {
-      URL.revokeObjectURL(lastPreviewRef.current);
+  const derivedEntries = useMemo(() => {
+    if (!jobSummary?.files) {
+      return [];
     }
-    lastPreviewRef.current = nextUrl;
-    setPreviewUrl(nextUrl);
+    return jobSummary.files.map((file) => {
+      const result = jobSummary.results?.find(
+        (entry) => entry.fileId === file.id
+      );
+      return {
+        ...file,
+        sizeLabel: formatFileSize(file.size),
+        description: result?.description ?? "",
+        tokens: result?.tokens ?? null,
+      };
+    });
+  }, [jobSummary]);
+
+  const jobActive = jobSummary && !terminalStatuses.has(jobSummary.status);
+
+  const handleFilesAdded = (fileList) => {
+    const incoming = Array.from(fileList ?? []);
+    if (!incoming.length) {
+      return;
+    }
+    setError("");
+    setFiles((prev) => {
+      const existingKeys = new Set(
+        prev.map(
+          (entry) =>
+            `${entry.file.name}-${entry.file.size}-${entry.file.lastModified}`
+        )
+      );
+      const merged = [...prev];
+      incoming.forEach((file) => {
+        const key = `${file.name}-${file.size}-${file.lastModified}`;
+        if (existingKeys.has(key)) {
+          return;
+        }
+        merged.push({ id: createClientId(), file });
+        existingKeys.add(key);
+      });
+      if (merged.length > MAX_FILES) {
+        setInfoMessage(
+          `Only the first ${MAX_FILES} files were kept to respect batch limits.`
+        );
+        return merged.slice(0, MAX_FILES);
+      }
+      return merged;
+    });
   };
 
-  const reset = () => {
-    setImageBase64("");
-    setDescription("");
-    setError("");
-    updatePreview("");
+  const handleRemoveFile = (id) => {
+    setFiles((prev) => prev.filter((file) => file.id !== id));
   };
 
-  const handleFileSelect = async (file) => {
-    if (!file) {
-      return;
-    }
+  const handleClearFiles = () => {
+    setFiles([]);
+    setError("");
+    setInfoMessage("");
+  };
 
-    if (!file.type.startsWith("image/")) {
-      setError("Please upload a valid image file.");
-      return;
+  const cleanupStreams = () => {
+    eventSourceRef.current?.close();
+    eventSourceRef.current = null;
+    if (pollIntervalRef.current) {
+      clearInterval(pollIntervalRef.current);
+      pollIntervalRef.current = null;
     }
+  };
 
-    if (file.size > 10 * 1024 * 1024) {
-      setError("Please upload an image smaller than 10MB.");
+  const subscribeToJob = (jobId) => {
+    cleanupStreams();
+    const streamUrl = `${API_BASE_URL}/api/jobs/${jobId}/stream`;
+    const eventSource = new EventSource(streamUrl);
+    eventSource.onmessage = (event) => {
+      const payload = JSON.parse(event.data);
+      setJobSummary(payload);
+      if (payload.downloadReady) {
+        setDownloadUrl(
+          `${API_BASE_URL}/api/jobs/${payload.id ?? jobId}/export`
+        );
+      }
+      if (terminalStatuses.has(payload.status)) {
+        eventSource.close();
+        eventSourceRef.current = null;
+      }
+    };
+    eventSource.onerror = () => {
+      setInfoMessage(
+        "Live progress stream disconnected. Falling back to polling."
+      );
+      eventSource.close();
+      eventSourceRef.current = null;
+      schedulePolling(jobId);
+    };
+    eventSourceRef.current = eventSource;
+  };
+
+  const schedulePolling = (jobId) => {
+    cleanupStreams();
+    pollIntervalRef.current = setInterval(async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/jobs/${jobId}`);
+        if (!response.ok) {
+          return;
+        }
+        const payload = await response.json();
+        setJobSummary(payload);
+        if (payload.downloadReady) {
+          setDownloadUrl(`${API_BASE_URL}/api/jobs/${jobId}/export`);
+        }
+        if (terminalStatuses.has(payload.status)) {
+          cleanupStreams();
+        }
+      } catch (pollError) {
+        console.error("Polling error", pollError);
+      }
+    }, 3500);
+  };
+
+  const handleStartBatch = async () => {
+    if (!files.length) {
+      setError("Please select at least one garment image.");
       return;
     }
 
     setError("");
-    setDescription("");
-
-    updatePreview(URL.createObjectURL(file));
+    setInfoMessage("");
+    setIsUploading(true);
+    setDownloadUrl("");
 
     try {
-      const base64Payload = await convertToBase64(file);
-      setImageBase64(base64Payload);
-    } catch (fileError) {
-      console.error(fileError);
-      setError("We couldn't process that image. Try another one.");
-      updatePreview("");
-    }
-  };
+      const formData = new FormData();
+      files.forEach((entry) => {
+        formData.append("images", entry.file, entry.file.name);
+      });
 
-  const handleGenerate = async () => {
-    if (!imageBase64) {
-      setError("Please add a garment image first.");
-      return;
-    }
-
-    setIsLoading(true);
-    setError("");
-
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/generate-description`, {
+      const response = await fetch(`${API_BASE_URL}/api/jobs`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ imageBase64 }),
+        body: formData,
       });
 
       if (!response.ok) {
-        throw new Error("Failed to generate description");
+        const payload = await response.json().catch(() => ({}));
+        throw new Error(payload.error ?? "Unable to queue batch.");
       }
 
-      const data = await response.json();
-      setDescription((data.description ?? "").trim());
-    } catch (requestError) {
-      console.error(requestError);
-      setError("Unable to generate description. Please try again.");
+      const payload = await response.json();
+      setFiles([]);
+      setJobSummary({
+        id: payload.jobId,
+        status: payload.status,
+        total: payload.total,
+        completed: 0,
+        failed: 0,
+        files: [],
+        results: [],
+        errors: [],
+        progressPercent: 0,
+      });
+      subscribeToJob(payload.jobId);
+    } catch (uploadError) {
+      console.error(uploadError);
+      setError(uploadError.message ?? "Failed to start the batch.");
     } finally {
-      setIsLoading(false);
+      setIsUploading(false);
     }
+  };
+
+  const handleReset = () => {
+    cleanupStreams();
+    setJobSummary(null);
+    setDownloadUrl("");
+    setError("");
+    setInfoMessage("");
+    setFiles([]);
   };
 
   return (
     <main className="min-h-screen bg-slate-100 px-4 py-10 text-slate-900">
-      <div className="mx-auto flex max-w-5xl flex-col gap-10">
+      <div className="mx-auto flex max-w-6xl flex-col gap-10">
         <header className="text-center">
           <p className="text-sm uppercase tracking-[0.4em] text-brand-600">
             Powered by GPT-4o Vision
@@ -137,42 +252,41 @@ function App() {
 
         <section className="grid gap-8 lg:grid-cols-[1.1fr_0.9fr]">
           <div className="space-y-6 rounded-3xl bg-white p-8 shadow-card">
-            <ImageUploader
-              preview={previewUrl}
-              onFileSelect={handleFileSelect}
-              onClear={reset}
-              isLoading={isLoading}
+            <BatchUploader
+              files={files}
+              onFilesAdded={handleFilesAdded}
+              onRemoveFile={handleRemoveFile}
+              onClear={handleClearFiles}
+              isDisabled={jobActive || isUploading}
+              maxFiles={MAX_FILES}
             />
 
-            <div className="flex flex-wrap gap-3">
-              <button
-                type="button"
-                onClick={handleGenerate}
-                disabled={isLoading || !imageBase64}
-                className="flex-1 rounded-2xl bg-brand-600 px-6 py-4 text-base font-semibold text-white transition hover:bg-brand-500 disabled:cursor-not-allowed disabled:bg-slate-300"
-              >
-                {isLoading ? "Analyzing..." : "Generate Description"}
-              </button>
-
-              {previewUrl && (
-                <button
-                  type="button"
-                  onClick={reset}
-                  disabled={isLoading}
-                  className="rounded-2xl border border-slate-300 px-6 py-4 text-base font-semibold text-slate-700 transition hover:border-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  Reset
-                </button>
-              )}
-            </div>
             {error && (
               <p className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
                 {error}
               </p>
             )}
+            {infoMessage && !error && (
+              <p className="rounded-2xl border border-brand-100 bg-brand-50 px-4 py-3 text-sm text-brand-700">
+                {infoMessage}
+              </p>
+            )}
+
+            <ProgressPanel
+              job={jobSummary}
+              isUploading={isUploading}
+              onStart={handleStartBatch}
+              onReset={handleReset}
+              disableStart={!files.length || jobActive}
+              downloadUrl={downloadUrl}
+            />
           </div>
 
-          <ResultCard description={description} isLoading={isLoading} />
+          <ResultsPanel
+            entries={derivedEntries}
+            jobStatus={jobSummary?.status}
+            errors={jobSummary?.errors ?? []}
+          />
         </section>
       </div>
     </main>

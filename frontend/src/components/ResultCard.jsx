@@ -1,42 +1,40 @@
-const placeholder = `Product Specifications
-- Fabric: -
-- Sleeves: -
-- Neckline: -
-- Bodice: -
-- Closure: -
-- Length: -
+const statusStyles = {
+  queued: "bg-slate-100 text-slate-600",
+  processing: "bg-amber-100 text-amber-700",
+  completed: "bg-emerald-100 text-emerald-700",
+  completed_with_errors: "bg-amber-100 text-amber-700",
+  failed: "bg-rose-100 text-rose-700",
+};
 
-Style & Fit
-- Silhouette: -
-- Color: -
-- Aesthetic: -`;
-
-function ResultCard({ description, isLoading }) {
-  const output = description?.trim() ? description.trim() : placeholder;
-
+export const StatusPill = ({ status }) => {
+  if (!status) return null;
+  const normalized = status.toLowerCase();
+  const styles = statusStyles[normalized] ?? "bg-slate-100 text-slate-600";
   return (
-    <aside className="flex h-full flex-col rounded-3xl bg-slate-900 p-8 text-white shadow-card">
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="text-xs uppercase tracking-[0.4em] text-brand-100">
-            Output
-          </p>
-          <h2 className="mt-2 text-2xl font-semibold">Product Copy</h2>
-        </div>
-        <span className="rounded-full border border-white/20 px-3 py-1 text-xs uppercase tracking-widest text-white/80">
-          {isLoading ? "Working" : "Ready"}
-        </span>
-      </div>
+    <span
+      className={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide ${styles}`}
+    >
+      {status.replaceAll("_", " ")}
+    </span>
+  );
+};
 
-      <div className="mt-6 flex-1 rounded-2xl bg-white/5 p-5 text-sm text-slate-100 shadow-inner">
-        <pre className="h-full whitespace-pre-wrap font-mono leading-relaxed">
-          {output}
-        </pre>
+function ResultCard({ entry }) {
+  return (
+    <article className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm shadow-inner">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p className="text-base font-semibold">{entry.originalName}</p>
+          <p className="text-xs text-white/60">
+            #{entry.order + 1} • {entry.sizeLabel}
+          </p>
+        </div>
+        <StatusPill status={entry.status} />
       </div>
-      <p className="mt-4 text-xs text-white/60">
-        Tip: provide clear, evenly lit imagery for the best technical specs.
-      </p>
-    </aside>
+      <pre className="mt-4 whitespace-pre-wrap font-mono text-[13px] leading-relaxed text-white/90">
+        {entry.description || "Processing..."}
+      </pre>
+    </article>
   );
 }
 
