@@ -1,36 +1,49 @@
 import cors from "cors";
+import { randomUUID } from "crypto";
 import dotenv from "dotenv";
 import express from "express";
 import morgan from "morgan";
-import OpenAI from "openai";
+import multer from "multer";
+import { jobStore } from "./jobs/jobStore.js";
+import { startJobProcessing } from "./services/jobRunner.js";
 
 dotenv.config();
 
 const app = express();
 const port = process.env.PORT || 5000;
+const MAX_FILES = Number(process.env.MAX_BATCH_SIZE ?? 200);
+const MAX_FILE_SIZE_MB = Number(process.env.MAX_IMAGE_MB ?? 10);
+const MODEL = process.env.OPENAI_VISION_MODEL ?? "gpt-4o-mini";
+const DESCRIPTION_PROMPT =
+  process.env.DESCRIPTION_PROMPT ??
+  "Review this garment image and fill every bullet. Favor exact fashion terminology.";
 
-app.use(
-  cors({
-    origin: [
-      "https://ai-fashion-catalog-generator-tfec.vercel.app",
-      "http://localhost:5174",
-    ],
-    credentials: true,
-  })
-);
-app.use(
-  express.json({
-    limit: "10mb",
-  })
-);
-app.use(
-  morgan("dev", {
-    skip: (req) => req.path === "/health",
-  })
-);
+const allowedOrigins = [
+  "https://ai-fashion-catalog-generator-tfec.vercel.app",
+  "http://localhost:5174",
+];
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
+if (process.env.ALLOWED_ORIGINS) {
+  allowedOrigins.push(
+    ...process.env.ALLOWED_ORIGINS.split(",")
+      .map((origin) => origin.trim())
+      .filter(Boolean)
+  );
+}
+
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    files: MAX_FILES,
+    fileSize: MAX_FILE_SIZE_MB * 1024 * 1024,
+  },
+  fileFilter: (_req, file, cb) => {
+    if (!file.mimetype.startsWith("image/")) {
+      cb(new Error("Only image uploads are supported."));
+      return;
+    }
+    cb(null, true);
+  },
 });
 
 const SYSTEM_PROMPT = `
@@ -48,91 +61,143 @@ Description (4 lines):
 Use elegant, inviting language suitable for a high-end e-commerce website.
 `.trim();
 
+if (!process.env.OPENAI_API_KEY) {
+  console.warn("OPENAI_API_KEY is not set. Generation requests will fail.");
+}
+
+app.use(
+  cors({
+    origin: allowedOrigins,
+    credentials: true,
+  })
+);
+app.use(
+  express.json({
+    limit: "10mb",
+  })
+);
+app.use(
+  morgan("dev", {
+    skip: (req) => req.path === "/health",
+  })
+);
+
 app.get("/health", (req, res) => {
   res.json({ status: "ok" });
 });
 
-app.post("/api/generate-description", async (req, res) => {
-  const { imageBase64 } = req.body || {};
-  console.log("imageBase64");
-  if (!imageBase64) {
-    return res.status(400).json({ error: "imageBase64 is required" });
-  }
-  const dataUrl = `data:image/png;base64,${imageBase64}`;
+const uploadMiddleware = upload.array("images", MAX_FILES);
 
-  try {
-    // const response = await openai.responses.create({
-    //   model: "gpt-4o",
-    //   input: [
-    //     {
-    //       role: "system",
-    //       content: [
-    //         {
-    //           type: "input_text",
-    //           text: SYSTEM_PROMPT,
-    //         },
-    //       ],
-    //     },
-    //     {
-    //       role: "user",
-    //       content: [
-    //         {
-    //           type: "input_text",
-    //           text: "Review this garment image and fill every bullet. Favor exact fashion terminology.",
-    //         },
-    //         {
-    //           type: "input_image",
-    //           image_base64: imageBase64,
-    //         },
-    //       ],
-    //     },
-    //   ],
-    //   temperature: 0.2,
-    // });
-    const dataUrl = `data:image/png;base64,${imageBase64}`;
-    const response = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: [
-        {
-          role: "user",
-          content: [
-            {
-              type: "text",
-              text: SYSTEM_PROMPT,
-            },
-            { type: "image_url", image_url: { url: dataUrl } },
-          ],
-        },
-      ],
-      max_tokens: 4096,
-    });
-    console.log("response", response);
-    // const textChunks =
-    //   response.output
-    //     ?.map((block) =>
-    //       block.content
-    //         ?.map((item) =>
-    //           item.type === "output_text" && item.text ? item.text : ""
-    //         )
-    //         .join("")
-    //     )
-    //     .filter(Boolean) ?? [];
-
-    const description = response?.choices?.[0]?.message?.content;
-
-    if (!description) {
-      return res
-        .status(502)
-        .json({ error: "No description returned from model." });
+app.post("/api/jobs", (req, res) => {
+  uploadMiddleware(req, res, (err) => {
+    if (err) {
+      return res.status(400).json({
+        error: err.message ?? "Unable to process upload.",
+      });
     }
 
-    res.json({ description });
-  } catch (error) {
-    console.error("OpenAI error", error);
-    res.status(500).json({
-      error: "Unable to generate description. Please try again.",
+    if (!process.env.OPENAI_API_KEY) {
+      return res.status(500).json({
+        error: "Missing OpenAI configuration on the server.",
+      });
+    }
+
+    const files = req.files ?? [];
+    if (!files.length) {
+      return res
+        .status(400)
+        .json({ error: "Please attach at least one image." });
+    }
+    if (files.length > MAX_FILES) {
+      return res.status(400).json({
+        error: `You can upload up to ${MAX_FILES} images per batch.`,
+      });
+    }
+
+    const filesMeta = files.map((file, index) => ({
+      id: randomUUID(),
+      order: index,
+      originalName: file.originalname,
+      size: file.size,
+      status: "queued",
+    }));
+
+    const job = jobStore.create(filesMeta);
+    jobStore.emit(job.id);
+
+    const tasks = files.map((file, index) => ({
+      jobId: job.id,
+      fileId: filesMeta[index].id,
+      imageBase64: file.buffer.toString("base64"),
+      prompt: SYSTEM_PROMPT,
+      model: MODEL,
+      apiKey: process.env.OPENAI_API_KEY,
+      descriptionPrompt: DESCRIPTION_PROMPT,
+    }));
+
+    startJobProcessing(job, tasks);
+
+    res.status(202).json({
+      jobId: job.id,
+      total: job.total,
+      status: job.status,
+    });
+  });
+});
+
+app.get("/api/jobs/:jobId", (req, res) => {
+  const summary = jobStore.summary(req.params.jobId);
+  if (!summary) {
+    return res.status(404).json({ error: "Job not found." });
+  }
+  return res.json(summary);
+});
+
+app.get("/api/jobs/:jobId/stream", (req, res) => {
+  const summary = jobStore.summary(req.params.jobId);
+  if (!summary) {
+    return res.status(404).end();
+  }
+
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache");
+  res.setHeader("Connection", "keep-alive");
+  res.flushHeaders?.();
+
+  const sendUpdate = (payload) => {
+    res.write(`data: ${JSON.stringify(payload)}\n\n`);
+  };
+
+  sendUpdate(summary);
+  const unsubscribe = jobStore.subscribe(req.params.jobId, sendUpdate);
+
+  req.on("close", () => {
+    unsubscribe?.();
+    res.end();
+  });
+});
+
+app.get("/api/jobs/:jobId/export", (req, res) => {
+  const download = jobStore.getDownload(req.params.jobId);
+  if (!download || !download.buffer) {
+    return res.status(409).json({
+      error: "Export not ready yet.",
     });
   }
+  res.setHeader(
+    "Content-Type",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+  );
+  res.setHeader(
+    "Content-Disposition",
+    `attachment; filename="${download.filename ?? `${req.params.jobId}.xlsx`}"`
+  );
+  return res.send(download.buffer);
+});
+
+app.use((err, _req, res, _next) => {
+  console.error(err);
+  res.status(500).json({ error: "Something went wrong." });
 });
 
 app.listen(port, () => {
