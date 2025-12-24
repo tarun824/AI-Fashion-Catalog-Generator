@@ -12,7 +12,7 @@ const port = process.env.PORT || 5000;
 app.use(
   cors({
     origin: [
-      "ai-fashion-catalog-generator-tfec.vercel.app",
+      "https://ai-fashion-catalog-generator.vercel.app",
       "http://localhost:5174",
     ],
     credentials: true,
