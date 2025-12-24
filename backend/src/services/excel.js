@@ -1,16 +1,54 @@
 import ExcelJS from "exceljs";
 
+const DESCRIPTION_LINE_COUNT = Number(
+  process.env.EXPORT_DESCRIPTION_LINES ?? 4
+);
+
+const parseDescription = (description) => {
+  if (!description) {
+    return {
+      name: "",
+      lines: Array.from({ length: DESCRIPTION_LINE_COUNT }, () => ""),
+    };
+  }
+
+  const lines = description
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  let productName = "";
+  const remaining = [];
+
+  lines.forEach((line) => {
+    const normalized = line.toLowerCase();
+    if (!productName && normalized.startsWith("name:")) {
+      productName = line.split(/name:/i)[1]?.trim() ?? "";
+      return;
+    }
+    if (normalized.startsWith("description")) {
+      return;
+    }
+    remaining.push(line.replace(/^[-•]\s*/, ""));
+  });
+
+  while (remaining.length < DESCRIPTION_LINE_COUNT) {
+    remaining.push("");
+  }
+
+  return {
+    name: productName || remaining.shift() || "",
+    lines: remaining.slice(0, DESCRIPTION_LINE_COUNT),
+  };
+};
+
 export const buildWorkbookBuffer = async (job) => {
   const workbook = new ExcelJS.Workbook();
   const sheet = workbook.addWorksheet("Fashion Catalog");
 
   sheet.columns = [
-    { header: "#", key: "index", width: 6 },
-    { header: "Filename", key: "filename", width: 32 },
-    { header: "Status", key: "status", width: 16 },
-    { header: "Tokens", key: "tokens", width: 12 },
-    { header: "Duration (ms)", key: "duration", width: 16 },
-    { header: "Generated Copy", key: "description", width: 80 },
+    { key: "frame", width: 38 },
+    { key: "details", width: 100 },
   ];
 
   const sortedResults = job.results
@@ -20,35 +58,35 @@ export const buildWorkbookBuffer = async (job) => {
         ...result,
         order: meta?.order ?? 0,
         filename: meta?.originalName ?? "Unknown",
-        status: meta?.status ?? "completed",
       };
     })
     .sort((a, b) => a.order - b.order);
 
   sortedResults.forEach((result, index) => {
+    const parsed = parseDescription(result.description);
+    const frameLabel = result.filename || `Image ${index + 1}`;
+
     sheet.addRow({
-      index: index + 1,
-      filename: result.filename,
-      status: result.status,
-      tokens: result.tokens ?? "—",
-      duration: result.durationMs ?? "—",
-      description: result.description ?? "",
+      frame: frameLabel,
+      details: `Name: ${parsed.name || "—"}`,
     });
+    sheet.addRow({ frame: "", details: "" });
+    sheet.addRow({ frame: "", details: "Description (4 lines):" });
+    parsed.lines.forEach((line) => {
+      sheet.addRow({ frame: "", details: line || "" });
+    });
+    sheet.addRow({ frame: "", details: "" });
   });
 
   if (job.errors.length > 0) {
-    sheet.addRow([]);
-    sheet.addRow(["Errors"]);
-    job.errors.forEach((errorDetail, errorIndex) => {
+    sheet.addRow({ frame: "Errors", details: "" });
+    job.errors.forEach((errorDetail) => {
       const meta = job.files.find((file) => file.id === errorDetail.fileId);
-      sheet.addRow([
-        `${errorIndex + 1}`,
-        meta?.originalName ?? "Unknown",
-        "failed",
-        "",
-        "",
-        errorDetail.error,
-      ]);
+      sheet.addRow({
+        frame: meta?.originalName ?? "Unknown",
+        details: `Failed: ${errorDetail.error}`,
+      });
+      sheet.addRow({ frame: "", details: "" });
     });
   }
 

@@ -53,3 +53,4 @@ function ResultsPanel({ entries, jobStatus, errors }) {
 }
 
 export default ResultsPanel;
+

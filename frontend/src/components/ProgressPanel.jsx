@@ -6,6 +6,21 @@ const statusLabelMap = {
   failed: "Failed",
 };
 
+const formatEta = (seconds) => {
+  if (!Number.isFinite(seconds) || seconds <= 0) {
+    return "Calculating…";
+  }
+  const mins = Math.floor(seconds / 60);
+  const secs = Math.max(Math.round(seconds % 60), 0);
+  if (mins === 0) {
+    return `${secs}s`;
+  }
+  if (secs === 0) {
+    return `${mins}m`;
+  }
+  return `${mins}m ${secs}s`;
+};
+
 function ProgressPanel({
   job,
   isUploading,
@@ -17,9 +32,10 @@ function ProgressPanel({
   const status = job?.status ?? "idle";
   const progressPercent = job?.progressPercent ?? 0;
   const isFinished = ["completed", "completed_with_errors", "failed"].includes(
-    status
+    status,
   );
   const processedCount = (job?.completed ?? 0) + (job?.failed ?? 0);
+  const etaSeconds = job?.etaSeconds ?? 0;
 
   return (
     <section className="rounded-3xl border border-slate-100 bg-white p-6">
@@ -31,6 +47,11 @@ function ProgressPanel({
           <h3 className="mt-2 text-xl font-semibold text-slate-900">
             {statusLabelMap[status] ?? "Idle"}
           </h3>
+          {etaSeconds > 0 && !isFinished && (
+            <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-slate-400">
+              ETA ~ {formatEta(etaSeconds)}
+            </p>
+          )}
         </div>
         {downloadUrl && (
           <a
@@ -103,3 +124,4 @@ function ProgressPanel({
 }
 
 export default ProgressPanel;
+
