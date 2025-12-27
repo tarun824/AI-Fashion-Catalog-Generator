@@ -12,7 +12,7 @@ dotenv.config();
 const app = express();
 const port = process.env.PORT || 5000;
 const MAX_FILES = Number(process.env.MAX_BATCH_SIZE ?? 200);
-const MAX_FILE_SIZE_MB = Number(process.env.MAX_IMAGE_MB ?? 10);
+const MAX_FILE_SIZE_MB = Number(process.env.MAX_IMAGE_MB ?? 20);
 const MODEL = process.env.OPENAI_VISION_MODEL ?? "gpt-4o-mini";
 const DESCRIPTION_PROMPT =
   process.env.DESCRIPTION_PROMPT ??
@@ -50,7 +50,7 @@ const SYSTEM_PROMPT = `
 You are a Senior E-commerce Fashion Specialist. 
 Analyze the garment image and generate a product listing in the EXACT following format:
 
-Name: [Create a catchy, descriptive product name]
+[Create a catchy, descriptive product name]
 
 Description (4 lines):
 - Line 1: Describe the primary fabric, pattern, and main design feature.
