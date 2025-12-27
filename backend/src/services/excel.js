@@ -4,6 +4,15 @@ const DESCRIPTION_LINE_COUNT = Number(
   process.env.EXPORT_DESCRIPTION_LINES ?? 4
 );
 
+const stripMarkdown = (text = "") =>
+  text
+    .replace(/^\s*\*\*/g, "")
+    .replace(/\*\*\s*$/g, "")
+    .trim();
+
+const removePrefix = (text = "", pattern) =>
+  stripMarkdown(text.replace(pattern, "")).trim();
+
 const parseDescription = (description) => {
   if (!description) {
     return {
@@ -22,14 +31,14 @@ const parseDescription = (description) => {
 
   lines.forEach((line) => {
     const normalized = line.toLowerCase();
-    if (!productName && normalized.startsWith("name:")) {
-      productName = line.split(/name:/i)[1]?.trim() ?? "";
+    if (!productName && normalized.startsWith("name")) {
+      productName = removePrefix(line, /^\**\s*(saree\s+)?name[:\-]?\s*/i);
       return;
     }
     if (normalized.startsWith("description")) {
       return;
     }
-    remaining.push(line.replace(/^[-•]\s*/, ""));
+    remaining.push(stripMarkdown(line.replace(/^[-•]\s*/, "")));
   });
 
   while (remaining.length < DESCRIPTION_LINE_COUNT) {
@@ -48,7 +57,8 @@ export const buildWorkbookBuffer = async (job) => {
 
   sheet.columns = [
     { key: "frame", width: 38 },
-    { key: "details", width: 100 },
+    { key: "label", width: 30 },
+    { key: "value", width: 100 },
   ];
 
   const sortedResults = job.results
@@ -66,27 +76,30 @@ export const buildWorkbookBuffer = async (job) => {
     const parsed = parseDescription(result.description);
     const frameLabel = result.filename || `Image ${index + 1}`;
 
+    sheet.addRow({ frame: frameLabel, label: "", value: "" });
     sheet.addRow({
-      frame: frameLabel,
-      details: `Name: ${parsed.name || "—"}`,
+      frame: "",
+      label: "Name",
+      value: parsed.name || "—",
     });
-    sheet.addRow({ frame: "", details: "" });
-    sheet.addRow({ frame: "", details: "Description (4 lines):" });
+    sheet.addRow({ frame: "", label: "", value: "" });
+    sheet.addRow({ frame: "", label: "Description (4 lines):", value: "" });
     parsed.lines.forEach((line) => {
-      sheet.addRow({ frame: "", details: line || "" });
+      sheet.addRow({ frame: "", label: "", value: line || "" });
     });
-    sheet.addRow({ frame: "", details: "" });
+    sheet.addRow({ frame: "", label: "", value: "" });
   });
 
   if (job.errors.length > 0) {
-    sheet.addRow({ frame: "Errors", details: "" });
+    sheet.addRow({ frame: "Errors", label: "", value: "" });
     job.errors.forEach((errorDetail) => {
       const meta = job.files.find((file) => file.id === errorDetail.fileId);
       sheet.addRow({
         frame: meta?.originalName ?? "Unknown",
-        details: `Failed: ${errorDetail.error}`,
+        label: "Failed",
+        value: errorDetail.error,
       });
-      sheet.addRow({ frame: "", details: "" });
+      sheet.addRow({ frame: "", label: "", value: "" });
     });
   }
 
