@@ -3,6 +3,49 @@ import ExcelJS from "exceljs";
 const DESCRIPTION_LINE_COUNT = Number(
   process.env.EXPORT_DESCRIPTION_LINES ?? 4
 );
+const IMAGE_ROW_HEIGHT = Number(process.env.EXPORT_IMAGE_ROW_HEIGHT ?? 160);
+const IMAGE_ROW_SPAN = Number(process.env.EXPORT_IMAGE_ROW_SPAN ?? 8);
+
+const MIME_EXTENSION_MAP = {
+  "image/png": "png",
+  "image/jpeg": "jpeg",
+  "image/jpg": "jpeg",
+};
+
+const getImageExtension = (mimeType = "") =>
+  MIME_EXTENSION_MAP[mimeType.toLowerCase()] ?? null;
+
+const addImageRow = (sheet, frameLabel) => {
+  const row = sheet.addRow({ frame: frameLabel, label: "", value: "" });
+  row.height = IMAGE_ROW_HEIGHT;
+  return row;
+};
+
+const embedImage = (workbook, sheet, rowNumber, fileMeta) => {
+  if (!fileMeta || !Buffer.isBuffer(fileMeta.buffer)) {
+    return false;
+  }
+  const extension = getImageExtension(fileMeta.mimeType);
+  if (!extension) {
+    return false;
+  }
+  try {
+    const imageId = workbook.addImage({
+      buffer: fileMeta.buffer,
+      extension,
+    });
+    const rowSpan = Math.max(IMAGE_ROW_SPAN, 2);
+    sheet.addImage(imageId, {
+      tl: { col: 0, row: rowNumber - 1 },
+      br: { col: 1, row: rowNumber - 1 + rowSpan },
+      editAs: "oneCell",
+    });
+    return true;
+  } catch (error) {
+    console.warn(`Unable to embed image "${fileMeta.originalName}":`, error);
+    return false;
+  }
+};
 
 const stripMarkdown = (text = "") =>
   text
@@ -74,9 +117,11 @@ export const buildWorkbookBuffer = async (job) => {
 
   sortedResults.forEach((result, index) => {
     const parsed = parseDescription(result.description);
-    const frameLabel = result.filename || `Image ${index + 1}`;
+    const meta = job.files.find((file) => file.id === result.fileId);
+    const frameLabel =
+      meta?.originalName || result.filename || `Image ${index + 1}`;
 
-    sheet.addRow({ frame: frameLabel, label: "", value: "" });
+    const imageRow = addImageRow(sheet, frameLabel);
     sheet.addRow({
       frame: "",
       label: "Name",
@@ -88,6 +133,15 @@ export const buildWorkbookBuffer = async (job) => {
       sheet.addRow({ frame: "", label: "", value: line || "" });
     });
     sheet.addRow({ frame: "", label: "", value: "" });
+
+    const inserted = embedImage(workbook, sheet, imageRow.number, meta);
+    if (!inserted) {
+      imageRow.alignment = {
+        vertical: "middle",
+        horizontal: "center",
+        wrapText: true,
+      };
+    }
   });
 
   if (job.errors.length > 0) {

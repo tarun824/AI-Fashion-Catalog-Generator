@@ -28,9 +28,11 @@ const sanitizeJob = (job) => {
   const progressPercent = job.total
     ? Math.round((processed / job.total) * 100)
     : 0;
-  const { emitter, download, ...rest } = job;
+  const { emitter, download, files = [], ...rest } = job;
+  const safeFiles = files.map(({ buffer, data, ...fileMeta }) => fileMeta);
   return {
     ...rest,
+    files: safeFiles,
     downloadReady: Boolean(download),
     progressPercent,
     etaSeconds: calculateEtaSeconds(job),
