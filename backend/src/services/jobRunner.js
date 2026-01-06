@@ -12,6 +12,17 @@ const workerPath = fileURLToPath(
   new URL("../workers/processImage.js", import.meta.url)
 );
 
+const releaseFileBuffers = (job) => {
+  if (!job?.files) {
+    return;
+  }
+  job.files.forEach((file) => {
+    if (file && file.buffer) {
+      file.buffer = null;
+    }
+  });
+};
+
 class WorkerQueue {
   constructor(limit) {
     this.limit = limit;
@@ -100,8 +111,10 @@ export const startJobProcessing = (job, tasks) => {
     try {
       const buffer = await buildWorkbookBuffer(latestJob);
       const filename = `fashion-catalog-${job.id}.xlsx`;
+      releaseFileBuffers(latestJob);
       jobStore.finalize(job.id, { buffer, filename });
     } catch (error) {
+      releaseFileBuffers(latestJob);
       jobStore.finalize(job.id, {
         buffer: null,
         filename: null,

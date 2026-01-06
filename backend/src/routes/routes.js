@@ -80,6 +80,8 @@ router.post("/api/jobs", (req, res) => {
         originalName: file.originalname,
         size: file.size,
         status: "queued",
+        mimeType: file.mimetype,
+        buffer: file.buffer,
       }));
 
       const job = jobStore.create(filesMeta);
