@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { useParams } from "react-router-dom";
-import { api } from "../utils/api";
+import { useParams, Link } from "react-router-dom";
+import { api, API_BASE_URL } from "../utils/api";
 import "../styles/CategoryBrowse.css";
 
 /**
@@ -148,11 +148,11 @@ const CategoryBrowse = () => {
 // Product Card Component
 const ProductCard = ({ product }) => {
   const imageUrl = product.thumbnail
-    ? `/api/images/${product.thumbnail}`
+    ? `${API_BASE_URL}/images/${product.thumbnail}`
     : "/placeholder-saree.jpg";
 
   return (
-    <a href={`/product/${product.slug}`} className="product-card">
+    <Link to={`/product/${product.slug}`} className="product-card">
       <div className="product-image">
         <img src={imageUrl} alt={product.name} />
         {!product.inStock && (
@@ -190,7 +190,7 @@ const ProductCard = ({ product }) => {
           </div>
         )}
       </div>
-    </a>
+    </Link>
   );
 };
 

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useVendorAuth } from "../contexts/VendorAuthContext";
-import { vendorApi, API_BASE_URL, API_PREFIX } from "../utils/api";
+import { vendorApi, API_BASE_URL } from "../utils/api";
 import ResultCard from "../components/ResultCard";
 
 const MAX_FILES = 200;
@@ -81,15 +81,13 @@ export default function VendorDashboard() {
 
   const subscribeToJob = (jobId) => {
     eventSourceRef.current?.close();
-    const streamUrl = `${API_BASE_URL}${API_PREFIX}/api/jobs/${jobId}/stream`;
+    const streamUrl = `${API_BASE_URL}/jobs/${jobId}/stream`;
     const eventSource = new EventSource(streamUrl);
     eventSource.onmessage = (event) => {
       const payload = JSON.parse(event.data);
       setJobSummary(payload);
       if (payload.downloadReady) {
-        setDownloadUrl(
-          `${API_BASE_URL}${API_PREFIX}/api/jobs/${payload.id ?? jobId}/export`,
-        );
+        setDownloadUrl(`${API_BASE_URL}/jobs/${payload.id ?? jobId}/export`);
       }
       if (terminalStatuses.has(payload.status)) {
         eventSource.close();
@@ -116,7 +114,7 @@ export default function VendorDashboard() {
         formData.append("images", entry.file, entry.file.name),
       );
 
-      const response = await fetch(`${API_BASE_URL}${API_PREFIX}/api/jobs`, {
+      const response = await fetch(`${API_BASE_URL}/jobs`, {
         method: "POST",
         body: formData,
         headers: {

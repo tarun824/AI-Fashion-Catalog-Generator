@@ -1,8 +1,7 @@
 const API_BASE_URL = (
-  import.meta.env.VITE_API_BASE_URL ?? "http://localhost:5000"
+  import.meta.env.VITE_API_BASE_URL ??
+  "http://localhost:5000/api/ai-fashion-generator"
 ).replace(/\/$/, "");
-
-const API_PREFIX = "/api/ai-fashion-generator";
 
 class ApiClient {
   constructor(baseUrl, tokenKey = "authToken") {
@@ -15,7 +14,7 @@ class ApiClient {
   }
 
   async request(endpoint, options = {}) {
-    const url = `${this.baseUrl}${API_PREFIX}${endpoint}`;
+    const url = `${this.baseUrl}${endpoint}`;
     const token = this.getAuthToken();
 
     const headers = {
@@ -78,10 +77,10 @@ class ApiClient {
 
   getImageUrl(gridFsId) {
     if (!gridFsId) return null;
-    return `${this.baseUrl}${API_PREFIX}/api/images/${gridFsId}`;
+    return `${this.baseUrl}/images/${gridFsId}`;
   }
 }
 
 export const api = new ApiClient(API_BASE_URL, "authToken");
 export const vendorApi = new ApiClient(API_BASE_URL, "vendorAuthToken");
-export { API_BASE_URL, API_PREFIX };
+export { API_BASE_URL };

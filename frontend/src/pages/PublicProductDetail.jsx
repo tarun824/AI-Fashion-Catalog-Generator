@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { useParams } from "react-router-dom";
-import { api } from "../utils/api";
+import { useParams, Link } from "react-router-dom";
+import { api, API_BASE_URL } from "../utils/api";
 import "../styles/PublicProductDetail.css";
 
 /**
@@ -46,7 +46,7 @@ const PublicProductDetail = () => {
     return (
       <div className="error-page">
         <h2>Product not found</h2>
-        <a href="/browse">Browse all products</a>
+        <Link to="/browse">Browse all products</Link>
       </div>
     );
   }
@@ -63,7 +63,7 @@ const PublicProductDetail = () => {
             <img
               src={
                 primaryImage?.gridFsId
-                  ? `/api/images/${primaryImage.gridFsId}`
+                  ? `${API_BASE_URL}/images/${primaryImage.gridFsId}`
                   : "/placeholder-saree.jpg"
               }
               alt={product.name}
@@ -81,8 +81,8 @@ const PublicProductDetail = () => {
                   <img
                     src={
                       img.thumbnailGridFsId
-                        ? `/api/images/${img.thumbnailGridFsId}`
-                        : `/api/images/${img.gridFsId}`
+                        ? `${API_BASE_URL}/images/${img.thumbnailGridFsId}`
+                        : `${API_BASE_URL}/images/${img.gridFsId}`
                     }
                     alt={`${product.name} view ${idx + 1}`}
                   />
