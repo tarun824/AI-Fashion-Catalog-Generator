@@ -442,13 +442,13 @@ export default function Products() {
                   </td>
                   <td className="px-6 py-4 text-right space-x-2">
                     <Link
-                      to={`/dashboard/products/${product._id}`}
+                      to={`/admin/products/${product._id}`}
                       className="text-indigo-600 hover:text-indigo-900 text-sm font-medium"
                     >
                       View
                     </Link>
                     <Link
-                      to={`/dashboard/products/${product._id}/edit`}
+                      to={`/admin/products/${product._id}/edit`}
                       className="text-blue-600 hover:text-blue-900 text-sm font-medium"
                     >
                       Edit

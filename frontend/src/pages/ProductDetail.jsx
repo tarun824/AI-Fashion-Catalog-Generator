@@ -45,7 +45,7 @@ export default function ProductDetail() {
 
     try {
       await api.delete(`/admin/products/${id}`);
-      navigate("/dashboard/products");
+      navigate("/admin/products");
     } catch (err) {
       alert("Failed to delete product: " + err.message);
     }
@@ -106,7 +106,7 @@ export default function ProductDetail() {
           Error: {error || "Product not found"}
         </div>
         <Link
-          to="/dashboard/products"
+          to="/admin/products"
           className="text-indigo-600 hover:text-indigo-900"
         >
           ← Back to Products
@@ -137,7 +137,7 @@ export default function ProductDetail() {
       <div className="flex justify-between items-start">
         <div>
           <Link
-            to="/dashboard/products"
+            to="/admin/products"
             className="text-indigo-600 hover:text-indigo-900 text-sm mb-2 inline-block"
           >
             ← Back to Products
@@ -151,7 +151,7 @@ export default function ProductDetail() {
         </div>
         <div className="flex space-x-2">
           <Link
-            to={`/dashboard/products/${id}/edit`}
+            to={`/admin/products/${id}/edit`}
             className="px-4 py-2 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition"
           >
             Edit
