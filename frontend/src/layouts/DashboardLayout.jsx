@@ -8,19 +8,22 @@ export default function DashboardLayout() {
 
   const handleLogout = () => {
     logout();
-    navigate("/login");
+    navigate("/admin/login");
   };
 
   const navItems = [
-    { path: "/dashboard", label: "Overview", icon: "📊" },
-    { path: "/dashboard/products", label: "Products", icon: "👕" },
-    { path: "/dashboard/batch-upload", label: "Batch Upload", icon: "📤" },
-    { path: "/dashboard/search", label: "Search", icon: "🔍" },
+    { path: "/admin/dashboard", label: "Overview", icon: "📊" },
+    { path: "/admin/products", label: "Products", icon: "👕" },
+    { path: "/admin/batch-upload", label: "Batch Upload", icon: "📤" },
+    { path: "/admin/search", label: "Search", icon: "🔍" },
   ];
 
   const isActive = (path) => {
-    if (path === "/dashboard") {
-      return location.pathname === "/dashboard";
+    if (path === "/admin/dashboard") {
+      return (
+        location.pathname === "/admin/dashboard" ||
+        location.pathname === "/admin"
+      );
     }
     return location.pathname.startsWith(path);
   };

@@ -86,7 +86,7 @@ export default function ProductEdit() {
       };
 
       await api.put(`/admin/products/${id}`, updateData);
-      navigate(`/dashboard/products/${id}`);
+      navigate(`/admin/products/${id}`);
     } catch (err) {
       setError(err.message);
       setSaving(false);
@@ -124,7 +124,7 @@ export default function ProductEdit() {
       {/* Header */}
       <div>
         <Link
-          to={`/dashboard/products/${id}`}
+          to={`/admin/products/${id}`}
           className="text-indigo-600 hover:text-indigo-900 text-sm mb-2 inline-block"
         >
           ← Back to Product
@@ -345,7 +345,7 @@ export default function ProductEdit() {
         {/* Actions */}
         <div className="flex justify-end space-x-3">
           <Link
-            to={`/dashboard/products/${id}`}
+            to={`/admin/products/${id}`}
             className="px-6 py-2 border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition"
           >
             Cancel

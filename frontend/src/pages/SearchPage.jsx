@@ -259,7 +259,7 @@ export default function SearchPage() {
               {results.map((product) => (
                 <Link
                   key={product._id}
-                  to={`/dashboard/products/${product._id}`}
+                  to={`/admin/products/${product._id}`}
                   className="flex items-start space-x-4 p-4 hover:bg-gray-50 transition"
                 >
                   {product.images?.thumbnail?.gridFsId && (
