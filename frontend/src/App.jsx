@@ -27,7 +27,7 @@ function App() {
   return (
     <AuthProvider>
       <VendorAuthProvider>
-        <BrowserRouter>
+        <BrowserRouter basename="/app/ai-fashion-generator">
           <Routes>
             {/* PUBLIC STOREFRONT - Main Site */}
             <Route path="/" element={<PublicHome />} />
