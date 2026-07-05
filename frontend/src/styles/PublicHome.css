@@ -1,0 +1,230 @@
+/* Public Home Page Styles */
+
+.public-home {
+  width: 100%;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+/* Hero Section */
+.hero-section {
+  width: 100%;
+  height: 600px;
+  background: linear-gradient(135deg, #8b2635 0%, #a53a4a 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  color: white;
+  margin-bottom: 60px;
+}
+
+.hero-content {
+  max-width: 800px;
+  padding: 40px 20px;
+}
+
+.hero-title {
+  font-family: "Playfair Display", serif;
+  font-size: 48px;
+  font-weight: 700;
+  margin-bottom: 20px;
+  line-height: 1.2;
+}
+
+.hero-subtitle {
+  font-size: 20px;
+  margin-bottom: 30px;
+  opacity: 0.9;
+}
+
+.btn-primary {
+  display: inline-block;
+  padding: 16px 40px;
+  background: #d4af37;
+  color: #2c2c2c;
+  border: none;
+  border-radius: 8px;
+  font-size: 18px;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.btn-primary:hover {
+  background: #e8c968;
+  transform: translateY(-2px);
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+}
+
+/* Section Styles */
+.occasion-section,
+.fabric-section,
+.features-section {
+  padding: 60px 20px;
+}
+
+.section-header {
+  text-align: center;
+  margin-bottom: 40px;
+}
+
+.section-header h2 {
+  font-family: "Playfair Display", serif;
+  font-size: 36px;
+  font-weight: 600;
+  color: #2c2c2c;
+  margin-bottom: 12px;
+}
+
+.subtitle {
+  font-size: 18px;
+  color: #6b6b6b;
+}
+
+/* Occasion Grid */
+.occasion-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 24px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.occasion-card {
+  display: block;
+  text-decoration: none;
+  color: inherit;
+  transition: transform 0.3s;
+}
+
+.occasion-card:hover {
+  transform: translateY(-8px);
+}
+
+.occasion-card-inner {
+  padding: 40px 24px;
+  border-radius: 12px;
+  border: 3px solid;
+  background: white;
+  text-align: center;
+  min-height: 150px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  transition: all 0.3s;
+}
+
+.occasion-card:hover .occasion-card-inner {
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.1);
+}
+
+.occasion-card h3 {
+  font-size: 24px;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.occasion-card p {
+  font-size: 14px;
+  color: #6b6b6b;
+}
+
+/* Fabric Grid */
+.fabric-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 20px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.fabric-card {
+  display: block;
+  padding: 60px 20px;
+  background: #fffbf5;
+  border-radius: 12px;
+  text-align: center;
+  text-decoration: none;
+  color: inherit;
+  border: 2px solid #e8e2d5;
+  transition: all 0.3s;
+}
+
+.fabric-card:hover {
+  border-color: #8b2635;
+  transform: translateY(-4px);
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+}
+
+.fabric-card h3 {
+  font-size: 20px;
+  font-weight: 600;
+  margin-bottom: 12px;
+  color: #2c2c2c;
+}
+
+.starting-price {
+  font-size: 16px;
+  color: #8b2635;
+  font-weight: 600;
+}
+
+/* Features Grid */
+.features-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 30px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.feature-card {
+  text-align: center;
+  padding: 40px 20px;
+  background: white;
+  border-radius: 12px;
+  border: 1px solid #e8e2d5;
+}
+
+.feature-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+}
+
+.feature-card h3 {
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 8px;
+  color: #2c2c2c;
+}
+
+.feature-card p {
+  font-size: 14px;
+  color: #6b6b6b;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .hero-title {
+    font-size: 32px;
+  }
+
+  .hero-subtitle {
+    font-size: 16px;
+  }
+
+  .section-header h2 {
+    font-size: 28px;
+  }
+
+  .occasion-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 16px;
+  }
+
+  .fabric-grid {
+    grid-template-columns: 1fr;
+  }
+}

@@ -1,0 +1,255 @@
+/* Category Browse Page Styles */
+
+.category-browse {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.category-header {
+  text-align: center;
+  padding: 40px 20px;
+  border-bottom: 1px solid #e8e2d5;
+  margin-bottom: 30px;
+}
+
+.category-header h1 {
+  font-family: "Playfair Display", serif;
+  font-size: 36px;
+  margin-bottom: 12px;
+  color: #2c2c2c;
+}
+
+.category-header p {
+  font-size: 18px;
+  color: #6b6b6b;
+  max-width: 600px;
+  margin: 0 auto 16px;
+}
+
+.product-count {
+  font-size: 14px;
+  color: #8b2635;
+  font-weight: 600;
+}
+
+.browse-container {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  gap: 30px;
+}
+
+/* Filters Sidebar */
+.filters-sidebar {
+  background: white;
+  padding: 24px;
+  border-radius: 12px;
+  border: 1px solid #e8e2d5;
+  height: fit-content;
+  position: sticky;
+  top: 20px;
+}
+
+.filters-sidebar h3 {
+  font-size: 20px;
+  font-weight: 600;
+  margin-bottom: 20px;
+  color: #2c2c2c;
+}
+
+.filter-group {
+  margin-bottom: 24px;
+}
+
+.filter-group label {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 8px;
+  color: #2c2c2c;
+}
+
+.filter-group select {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #e8e2d5;
+  border-radius: 8px;
+  font-size: 14px;
+  background: white;
+  cursor: pointer;
+}
+
+/* Product Grid */
+.products-main {
+  width: 100%;
+}
+
+.product-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 24px;
+  margin-bottom: 40px;
+}
+
+.product-card {
+  display: block;
+  background: white;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid #e8e2d5;
+  text-decoration: none;
+  color: inherit;
+  transition: all 0.3s;
+}
+
+.product-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+}
+
+.product-image {
+  position: relative;
+  aspect-ratio: 3/4;
+  overflow: hidden;
+  background: #f5f5f5;
+}
+
+.product-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.5s;
+}
+
+.product-card:hover .product-image img {
+  transform: scale(1.1);
+}
+
+.badge {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  color: white;
+}
+
+.badge.out-of-stock {
+  background: #c53030;
+}
+
+.product-info {
+  padding: 16px;
+}
+
+.product-name {
+  font-size: 16px;
+  font-weight: 500;
+  margin-bottom: 4px;
+  color: #2c2c2c;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.product-meta {
+  font-size: 14px;
+  color: #6b6b6b;
+  margin-bottom: 8px;
+}
+
+.product-colors {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.color-dot {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid #e8e2d5;
+}
+
+.product-price {
+  margin-bottom: 8px;
+}
+
+.product-price .price {
+  font-size: 20px;
+  font-weight: 700;
+  color: #2c2c2c;
+}
+
+.product-rating {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 14px;
+}
+
+.product-rating .stars {
+  color: #d4af37;
+}
+
+.product-rating .count {
+  color: #6b6b6b;
+}
+
+/* Loading & Empty States */
+.loading,
+.no-products {
+  text-align: center;
+  padding: 60px 20px;
+  color: #6b6b6b;
+}
+
+/* Pagination */
+.pagination {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 16px;
+  padding: 40px 20px;
+}
+
+.pagination button {
+  padding: 10px 20px;
+  background: white;
+  border: 1px solid #e8e2d5;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.pagination button:hover:not(:disabled) {
+  background: #8b2635;
+  color: white;
+  border-color: #8b2635;
+}
+
+.pagination button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .browse-container {
+    grid-template-columns: 1fr;
+  }
+
+  .filters-sidebar {
+    position: static;
+  }
+
+  .product-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 16px;
+  }
+}

@@ -1,7 +1,8 @@
 import ExcelJS from "exceljs";
+import { downloadImage } from "./imageStorage.js";
 
 const DESCRIPTION_LINE_COUNT = Number(
-  process.env.EXPORT_DESCRIPTION_LINES ?? 4
+  process.env.EXPORT_DESCRIPTION_LINES ?? 4,
 );
 const IMAGE_ROW_HEIGHT = Number(process.env.EXPORT_IMAGE_ROW_HEIGHT ?? 160);
 const IMAGE_ROW_SPAN = Number(process.env.EXPORT_IMAGE_ROW_SPAN ?? 8);
@@ -78,7 +79,11 @@ const parseDescription = (description) => {
       productName = removePrefix(line, /^\**\s*(saree\s+)?name[:\-]?\s*/i);
       return;
     }
-    if (normalized.startsWith("description")) {
+    // Skip description header and colors line
+    if (
+      normalized.startsWith("description") ||
+      normalized.startsWith("colors:")
+    ) {
       return;
     }
     remaining.push(stripMarkdown(line.replace(/^[-•]\s*/, "")));
@@ -105,21 +110,35 @@ export const buildWorkbookBuffer = async (job) => {
   ];
 
   const sortedResults = job.results
+    .filter((r) => !r.error) // Only successful results
     .map((result) => {
-      const meta = job.files.find((file) => file.id === result.fileId);
+      const meta = job.files.find((file) => file.fileId === result.fileId);
       return {
         ...result,
         order: meta?.order ?? 0,
         filename: meta?.originalName ?? "Unknown",
+        fileMeta: meta,
       };
     })
     .sort((a, b) => a.order - b.order);
 
+  // Download images from GridFS for all results
+  for (const result of sortedResults) {
+    if (result.fileMeta?.gridFsId) {
+      try {
+        result.fileMeta.buffer = await downloadImage(result.fileMeta.gridFsId);
+      } catch (error) {
+        console.warn(
+          `Failed to download image for ${result.filename}:`,
+          error.message,
+        );
+      }
+    }
+  }
+
   sortedResults.forEach((result, index) => {
     const parsed = parseDescription(result.description);
-    const meta = job.files.find((file) => file.id === result.fileId);
-    const frameLabel =
-      meta?.originalName || result.filename || `Image ${index + 1}`;
+    const frameLabel = result.filename || `Image ${index + 1}`;
 
     const imageRow = addImageRow(sheet, frameLabel);
     sheet.addRow({
@@ -134,7 +153,24 @@ export const buildWorkbookBuffer = async (job) => {
     });
     sheet.addRow({ frame: "", label: "", value: "" });
 
-    const inserted = embedImage(workbook, sheet, imageRow.number, meta);
+    // Add colors row
+    const colorsText =
+      result.colors && result.colors.length > 0
+        ? result.colors.join(", ")
+        : "No colors detected";
+    sheet.addRow({
+      frame: "",
+      label: "Colors",
+      value: colorsText,
+    });
+    sheet.addRow({ frame: "", label: "", value: "" });
+
+    const inserted = embedImage(
+      workbook,
+      sheet,
+      imageRow.number,
+      result.fileMeta,
+    );
     if (!inserted) {
       imageRow.alignment = {
         vertical: "middle",
@@ -144,10 +180,12 @@ export const buildWorkbookBuffer = async (job) => {
     }
   });
 
-  if (job.errors.length > 0) {
+  // Add errors section
+  const errors = job.results.filter((r) => r.error);
+  if (errors.length > 0) {
     sheet.addRow({ frame: "Errors", label: "", value: "" });
-    job.errors.forEach((errorDetail) => {
-      const meta = job.files.find((file) => file.id === errorDetail.fileId);
+    errors.forEach((errorDetail) => {
+      const meta = job.files.find((file) => file.fileId === errorDetail.fileId);
       sheet.addRow({
         frame: meta?.originalName ?? "Unknown",
         label: "Failed",
