@@ -6,10 +6,10 @@ import ResultsPanel from "../components/ResultsPanel";
 import { matchesColorFamily, getAllUniqueColors } from "../utils/colorFamilies";
 
 const API_BASE_URL = (
-  import.meta.env.VITE_API_BASE_URL ?? "http://localhost:5000"
+  import.meta.env.VITE_API_BASE_URL ??
+  "http://localhost:5000/api/ai-fashion-generator"
 ).replace(/\/$/, "");
 
-const API_PREFIX = "/api/ai-fashion-generator";
 const MAX_FILES = 200;
 
 const createClientId = () =>
@@ -169,15 +169,13 @@ export default function BatchUploadPage() {
 
   const subscribeToJob = (jobId) => {
     cleanupStreams();
-    const streamUrl = `${API_BASE_URL}${API_PREFIX}/api/jobs/${jobId}/stream`;
+    const streamUrl = `${API_BASE_URL}/jobs/${jobId}/stream`;
     const eventSource = new EventSource(streamUrl);
     eventSource.onmessage = (event) => {
       const payload = JSON.parse(event.data);
       setJobSummary(payload);
       if (payload.downloadReady) {
-        setDownloadUrl(
-          `${API_BASE_URL}${API_PREFIX}/api/jobs/${payload.id ?? jobId}/export`,
-        );
+        setDownloadUrl(`${API_BASE_URL}/jobs/${payload.id ?? jobId}/export`);
       }
       if (terminalStatuses.has(payload.status)) {
         eventSource.close();
@@ -199,18 +197,14 @@ export default function BatchUploadPage() {
     cleanupStreams();
     pollIntervalRef.current = setInterval(async () => {
       try {
-        const response = await fetch(
-          `${API_BASE_URL}${API_PREFIX}/api/jobs/${jobId}`,
-        );
+        const response = await fetch(`${API_BASE_URL}/jobs/${jobId}`);
         if (!response.ok) {
           return;
         }
         const payload = await response.json();
         setJobSummary(payload);
         if (payload.downloadReady) {
-          setDownloadUrl(
-            `${API_BASE_URL}${API_PREFIX}/api/jobs/${jobId}/export`,
-          );
+          setDownloadUrl(`${API_BASE_URL}/jobs/${jobId}/export`);
         }
         if (terminalStatuses.has(payload.status)) {
           cleanupStreams();
@@ -238,7 +232,7 @@ export default function BatchUploadPage() {
         formData.append("images", entry.file, entry.file.name);
       });
 
-      const response = await fetch(`${API_BASE_URL}${API_PREFIX}/api/jobs`, {
+      const response = await fetch(`${API_BASE_URL}/jobs`, {
         method: "POST",
         body: formData,
         headers: {
