@@ -13,9 +13,9 @@ const port = process.env.PORT || 5000;
 const API_PREFIX = process.env.API_PREFIX ?? "/api/ai-fashion-generator";
 
 const allowedOrigins = [
-  `https://ai-fashion-catalog-generator-tfec.vercel.app`,
-  `https://tarun.software`,
-  "https://tarun.software/app/ai-fashion-generator",
+  "https://ai-fashion-catalog-generator-tfec.vercel.app",
+  "https://tarun.software",
+  "http://localhost:5173",
 ];
 
 if (process.env.ALLOWED_ORIGINS) {
@@ -30,9 +30,21 @@ if (!process.env.OPENAI_API_KEY) {
   console.warn("OPENAI_API_KEY is not set. Generation requests will fail.");
 }
 
+console.log("✓ CORS allowed origins:", allowedOrigins);
+
 app.use(
   cors({
-    origin: allowedOrigins,
+    origin: (origin, callback) => {
+      // Allow requests with no origin (like mobile apps, Postman, curl)
+      if (!origin) return callback(null, true);
+
+      if (allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        console.warn(`❌ CORS blocked origin: ${origin}`);
+        callback(new Error(`Origin ${origin} not allowed by CORS`));
+      }
+    },
     credentials: true,
   }),
 );
