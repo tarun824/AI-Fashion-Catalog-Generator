@@ -9,7 +9,7 @@ const CONCURRENCY =
   Math.max(2, Math.min(6, os.cpus().length));
 
 const workerPath = fileURLToPath(
-  new URL("../workers/processImage.js", import.meta.url)
+  new URL("../workers/processImage.js", import.meta.url),
 );
 
 const releaseFileBuffers = (job) => {
@@ -88,34 +88,42 @@ export const startJobProcessing = (job, tasks) => {
 
   const taskPromises = tasks.map((task) =>
     queue.push(async () => {
-      jobStore.markFileStatus(job.id, task.fileId, "processing");
+      await jobStore.markFileStatus(job.id, task.fileId, "processing");
       const startedAt = Date.now();
       try {
         const result = await runWorkerTask(task);
-        jobStore.markSuccess(job.id, task.fileId, {
+        await jobStore.markSuccess(job.id, task.fileId, {
           description: result.description,
+          colors: result.colors || [],
+          category: result.category || "",
+          tags: result.tags || [],
+          approxPrice: result.approxPrice ?? null,
+          fabric: result.fabric || "",
+          borderType: result.borderType || "",
+          occasion: result.occasion || "",
+          workType: result.workType || "",
+          weight: result.weight || "",
+          blouseIncluded: Boolean(result.blouseIncluded),
           tokens: result.tokens,
           durationMs: Date.now() - startedAt,
         });
       } catch (error) {
-        jobStore.markFailure(job.id, task.fileId, error.message);
+        await jobStore.markFailure(job.id, task.fileId, error.message);
       }
-    })
+    }),
   );
 
   Promise.allSettled(taskPromises).then(async () => {
-    const latestJob = jobStore.get(job.id);
+    const latestJob = await jobStore.get(job.id);
     if (!latestJob) {
       return;
     }
     try {
       const buffer = await buildWorkbookBuffer(latestJob);
       const filename = `fashion-catalog-${job.id}.xlsx`;
-      releaseFileBuffers(latestJob);
-      jobStore.finalize(job.id, { buffer, filename });
+      await jobStore.finalize(job.id, { buffer, filename });
     } catch (error) {
-      releaseFileBuffers(latestJob);
-      jobStore.finalize(job.id, {
+      await jobStore.finalize(job.id, {
         buffer: null,
         filename: null,
       });

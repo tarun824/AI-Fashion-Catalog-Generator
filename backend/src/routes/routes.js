@@ -1,15 +1,25 @@
 import express from "express";
 import { jobStore } from "../jobs/jobStore.js";
 import { startJobProcessing } from "../services/jobRunner.js";
+import { SYSTEM_PROMPT } from "../config/prompt.js";
 import multer from "multer";
 import { randomUUID } from "crypto";
+import authRoutes from "./authRoutes.js";
+import adminRoutes from "./adminRoutes.js";
+import searchRoutes from "./searchRoutes.js";
+import imageRoutes from "./imageRoutes.js";
+import vendorAuthRoutes from "./vendorAuthRoutes.js";
+import vendorRoutes from "./vendorRoutes.js";
+import publicRoutes from "./publicRoutes.js";
+import { flexibleAuthMiddleware } from "../middleware/auth.js";
+
 const router = express.Router();
 const MAX_FILES = Number(process.env.MAX_BATCH_SIZE ?? 200);
 const MAX_FILE_SIZE_MB = Number(process.env.MAX_IMAGE_MB ?? 20);
 const MODEL = process.env.OPENAI_VISION_MODEL ?? "gpt-4o-mini";
 const DESCRIPTION_PROMPT =
   process.env.DESCRIPTION_PROMPT ??
-  "Review this garment image and fill every bullet. Favor exact fashion terminology.";
+  "Analyze this garment image carefully and provide the output in the EXACT format specified. CRITICAL: You MUST include the Colors line at the end with 2-5 dominant colors separated by commas. Do not skip any section.";
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -26,28 +36,13 @@ const upload = multer({
   },
 });
 
-const SYSTEM_PROMPT = `
-  You are a Senior E-commerce Fashion Specialist. 
-  Analyze the garment image and generate a product listing in the EXACT following format:
-  
-  [Create a catchy, descriptive product name]
-  
-  Description (4 lines):
-  - Line 1: Describe the primary fabric, pattern, and main design feature.
-  - Line 2: Detail the specific accents (like borders, zari, or textures).
-  - Line 3: Mention the fit, drape, or how it feels to wear.
-  - Line 4: Suggest the best occasions or the overall style value.
-  
-  Use elegant, inviting language suitable for a high-end e-commerce website.
-  `.trim();
-
 router.get("/health", (req, res) => {
   res.json({ status: "ok" });
 });
 
 const uploadMiddleware = upload.array("images", MAX_FILES);
 
-router.post("/api/jobs", (req, res) => {
+router.post("/api/jobs", flexibleAuthMiddleware, (req, res) => {
   try {
     uploadMiddleware(req, res, (err) => {
       if (err) {
@@ -84,26 +79,37 @@ router.post("/api/jobs", (req, res) => {
         buffer: file.buffer,
       }));
 
-      const job = jobStore.create(filesMeta);
-      jobStore.emit(job.id);
+      // Create job and upload images to GridFS
+      const vendorId = req.vendor?._id ?? null;
+      const uploadedBy = req.vendor?.email ?? req.admin?.email ?? "admin";
 
-      const tasks = files.map((file, index) => ({
-        jobId: job.id,
-        fileId: filesMeta[index].id,
-        imageBase64: file.buffer.toString("base64"),
-        prompt: SYSTEM_PROMPT,
-        model: MODEL,
-        apiKey: process.env.OPENAI_API_KEY,
-        descriptionPrompt: DESCRIPTION_PROMPT,
-      }));
+      jobStore
+        .create(filesMeta, { vendorId, uploadedBy })
+        .then((job) => {
+          jobStore.emit(job.id);
 
-      startJobProcessing(job, tasks);
+          const tasks = files.map((file, index) => ({
+            jobId: job.id,
+            fileId: filesMeta[index].id,
+            imageBase64: file.buffer.toString("base64"),
+            prompt: SYSTEM_PROMPT,
+            model: MODEL,
+            apiKey: process.env.OPENAI_API_KEY,
+            descriptionPrompt: DESCRIPTION_PROMPT,
+          }));
 
-      res.status(202).json({
-        jobId: job.id,
-        total: job.total,
-        status: job.status,
-      });
+          startJobProcessing(job, tasks);
+
+          res.status(202).json({
+            jobId: job.id,
+            total: job.total,
+            status: job.status,
+          });
+        })
+        .catch((error) => {
+          console.error("Job creation error:", error);
+          res.status(500).json({ error: "Failed to create job." });
+        });
     });
   } catch (error) {
     console.error(error);
@@ -111,9 +117,9 @@ router.post("/api/jobs", (req, res) => {
   }
 });
 
-router.get("/api/jobs/:jobId", (req, res) => {
+router.get("/api/jobs/:jobId", async (req, res) => {
   try {
-    const summary = jobStore.summary(req.params.jobId);
+    const summary = await jobStore.summary(req.params.jobId);
     if (!summary) {
       return res.status(404).json({ error: "Job not found." });
     }
@@ -124,9 +130,9 @@ router.get("/api/jobs/:jobId", (req, res) => {
   }
 });
 
-router.get("/api/jobs/:jobId/stream", (req, res) => {
+router.get("/api/jobs/:jobId/stream", async (req, res) => {
   try {
-    const summary = jobStore.summary(req.params.jobId);
+    const summary = await jobStore.summary(req.params.jobId);
     if (!summary) {
       return res.status(404).end();
     }
@@ -153,9 +159,9 @@ router.get("/api/jobs/:jobId/stream", (req, res) => {
   }
 });
 
-router.get("/api/jobs/:jobId/export", (req, res) => {
+router.get("/api/jobs/:jobId/export", async (req, res) => {
   try {
-    const download = jobStore.getDownload(req.params.jobId);
+    const download = await jobStore.getDownload(req.params.jobId);
     if (!download || !download.buffer) {
       return res.status(409).json({
         error: "Export not ready yet.",
@@ -163,13 +169,13 @@ router.get("/api/jobs/:jobId/export", (req, res) => {
     }
     res.setHeader(
       "Content-Type",
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     );
     res.setHeader(
       "Content-Disposition",
       `attachment; filename="${
         download.filename ?? `${req.params.jobId}.xlsx`
-      }"`
+      }"`,
     );
     return res.send(download.buffer);
   } catch (error) {
@@ -177,5 +183,14 @@ router.get("/api/jobs/:jobId/export", (req, res) => {
     res.status(500).json({ error: "Something went wrong." });
   }
 });
+
+// Mount new routes
+router.use("/api/public", publicRoutes);
+router.use("/api/admin/auth", authRoutes);
+router.use("/api/admin/products", adminRoutes);
+router.use("/api/search", searchRoutes);
+router.use("/api/images", imageRoutes);
+router.use("/api/vendor/auth", vendorAuthRoutes);
+router.use("/api/vendor/products", vendorRoutes);
 
 export default router;

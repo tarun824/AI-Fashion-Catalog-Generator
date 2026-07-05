@@ -1,17 +1,5 @@
 import WorkerPool from "./workerPool.js";
-import {
-  appendImagesToJob,
-  createJob,
-  getJob,
-  isJobComplete,
-  markExcelBuilding,
-  markExcelError,
-  markExcelReady,
-  markImageCompleted,
-  markImageFailed,
-  markImageProcessing,
-  serializeJob,
-} from "./jobStore.js";
+import { jobStore } from "./jobStore.js";
 import { buildExcelForJob } from "./excelExporter.js";
 
 const workerPath = new URL("../workers/imageWorker.js", import.meta.url);
@@ -24,22 +12,29 @@ const workerPool = new WorkerPool({
   },
 });
 
-const scheduleExcelIfNeeded = (jobId) => {
-  const job = getJob(jobId);
-  if (!job || !isJobComplete(jobId)) {
-    return;
+const scheduleExcelIfNeeded = async (jobId) => {
+  const job = await jobStore.get(jobId);
+  if (!job) return;
+
+  const isComplete =
+    job.progress.completed + job.progress.failed >= job.progress.total;
+  if (!isComplete) return;
+
+  if (job.export.ready || job.export.building) return;
+
+  // Mark as building
+  await jobStore.setStatus(jobId, job.status, { "export.building": true });
+
+  try {
+    const { buffer, filename } = await buildExcelForJob(job);
+    await jobStore.finalize(jobId, { buffer, filename });
+  } catch (error) {
+    console.error("Excel export error:", error);
+    await jobStore.setStatus(jobId, job.status, {
+      "export.building": false,
+      "export.error": error.message || "Excel export failed",
+    });
   }
-
-  if (job.excel.ready || job.excel.building) {
-    return;
-  }
-
-  markExcelBuilding(jobId);
-  const snapshot = JSON.parse(JSON.stringify(job));
-
-  buildExcelForJob(snapshot)
-    .then((filePath) => markExcelReady(jobId, filePath))
-    .catch((error) => markExcelError(jobId, error.message || "Excel export failed"));
 };
 
 const dispatchTask = (jobId, task, systemPrompt) => {
@@ -52,50 +47,34 @@ const dispatchTask = (jobId, task, systemPrompt) => {
         systemPrompt,
       },
       {
-        onStart: () => markImageProcessing(jobId, task.id),
+        onStart: () => jobStore.markFileStatus(jobId, task.id, "processing"),
       },
     )
-    .then((result) => {
-      markImageCompleted(jobId, task.id, result.description ?? "");
-      scheduleExcelIfNeeded(jobId);
+    .then(async (result) => {
+      await jobStore.markSuccess(jobId, task.id, {
+        description: result.description ?? "",
+        colors: result.colors ?? [],
+        tokens: result.tokens ?? 0,
+        durationMs: result.durationMs ?? 0,
+      });
+      await scheduleExcelIfNeeded(jobId);
     })
-    .catch((error) => {
-      markImageFailed(jobId, task.id, error?.message ?? "Processing failed");
-      scheduleExcelIfNeeded(jobId);
+    .catch(async (error) => {
+      await jobStore.markFailure(
+        jobId,
+        task.id,
+        error?.message ?? "Processing failed",
+      );
+      await scheduleExcelIfNeeded(jobId);
     });
 };
 
-const queueFilesForJob = (jobId, files, systemPrompt) => {
-  const { job, tasks, rejected } = appendImagesToJob(jobId, files);
+export const processJobTasks = (job, tasks) => {
+  const systemPrompt = process.env.SYSTEM_PROMPT || "";
 
   tasks.forEach((task) => dispatchTask(job.id, task, systemPrompt));
-
-  return {
-    jobId: job.id,
-    accepted: tasks.length,
-    rejected,
-    status: serializeJob(getJob(job.id)),
-  };
 };
 
-export const upsertJobWithFiles = ({ jobId, files, systemPrompt }) => {
-  let job = jobId ? getJob(jobId) : createJob();
-
-  if (jobId && !job) {
-    const error = new Error("Job not found");
-    error.status = 404;
-    throw error;
-  }
-
-  if (!job) {
-    job = createJob();
-  }
-
-  return queueFilesForJob(job.id, files, systemPrompt);
+export const getJobSummary = async (jobId) => {
+  return await jobStore.summary(jobId);
 };
-
-export const getJobSummary = (jobId) => {
-  const job = getJob(jobId);
-  return serializeJob(job);
-};
-
