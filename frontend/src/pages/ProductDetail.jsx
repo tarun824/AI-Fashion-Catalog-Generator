@@ -22,7 +22,7 @@ export default function ProductDetail() {
 
   const loadProduct = async () => {
     try {
-      const response = await api.get(`/api/admin/products/${id}`);
+      const response = await api.get(`/admin/products/${id}`);
       setProduct(response.data);
     } catch (err) {
       setError(err.message);
@@ -33,7 +33,7 @@ export default function ProductDetail() {
 
   const handleStatusChange = async (status) => {
     try {
-      await api.patch(`/api/admin/products/${id}/status`, { status });
+      await api.patch(`/admin/products/${id}/status`, { status });
       loadProduct();
     } catch (err) {
       alert("Failed to update status: " + err.message);
@@ -44,7 +44,7 @@ export default function ProductDetail() {
     if (!confirm("Delete this product? This cannot be undone.")) return;
 
     try {
-      await api.delete(`/api/admin/products/${id}`);
+      await api.delete(`/admin/products/${id}`);
       navigate("/dashboard/products");
     } catch (err) {
       alert("Failed to delete product: " + err.message);
@@ -56,7 +56,7 @@ export default function ProductDetail() {
     setSavingVariant(true);
 
     try {
-      await api.post(`/api/admin/products/${id}/variants`, {
+      await api.post(`/admin/products/${id}/variants`, {
         size: variantForm.size.trim(),
         color: variantForm.color.trim(),
         stock: Number(variantForm.stock) || 0,
@@ -72,7 +72,7 @@ export default function ProductDetail() {
 
   const handleVariantStockChange = async (variantId, stock) => {
     try {
-      await api.put(`/api/admin/products/${id}/variants/${variantId}`, {
+      await api.put(`/admin/products/${id}/variants/${variantId}`, {
         stock: Number(stock) || 0,
       });
       loadProduct();
@@ -84,7 +84,7 @@ export default function ProductDetail() {
   const handleDeleteVariant = async (variantId) => {
     if (!confirm("Remove this variant?")) return;
     try {
-      await api.delete(`/api/admin/products/${id}/variants/${variantId}`);
+      await api.delete(`/admin/products/${id}/variants/${variantId}`);
       loadProduct();
     } catch (err) {
       alert("Failed to remove variant: " + err.message);

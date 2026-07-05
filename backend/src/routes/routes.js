@@ -42,7 +42,7 @@ router.get("/health", (req, res) => {
 
 const uploadMiddleware = upload.array("images", MAX_FILES);
 
-router.post("/api/jobs", flexibleAuthMiddleware, (req, res) => {
+router.post("/jobs", flexibleAuthMiddleware, (req, res) => {
   try {
     uploadMiddleware(req, res, (err) => {
       if (err) {
@@ -117,7 +117,7 @@ router.post("/api/jobs", flexibleAuthMiddleware, (req, res) => {
   }
 });
 
-router.get("/api/jobs/:jobId", async (req, res) => {
+router.get("/jobs/:jobId", async (req, res) => {
   try {
     const summary = await jobStore.summary(req.params.jobId);
     if (!summary) {
@@ -130,7 +130,7 @@ router.get("/api/jobs/:jobId", async (req, res) => {
   }
 });
 
-router.get("/api/jobs/:jobId/stream", async (req, res) => {
+router.get("/jobs/:jobId/stream", async (req, res) => {
   try {
     const summary = await jobStore.summary(req.params.jobId);
     if (!summary) {
@@ -159,7 +159,7 @@ router.get("/api/jobs/:jobId/stream", async (req, res) => {
   }
 });
 
-router.get("/api/jobs/:jobId/export", async (req, res) => {
+router.get("/jobs/:jobId/export", async (req, res) => {
   try {
     const download = await jobStore.getDownload(req.params.jobId);
     if (!download || !download.buffer) {
@@ -184,13 +184,13 @@ router.get("/api/jobs/:jobId/export", async (req, res) => {
   }
 });
 
-// Mount new routes
-router.use("/api/public", publicRoutes);
-router.use("/api/admin/auth", authRoutes);
-router.use("/api/admin/products", adminRoutes);
-router.use("/api/search", searchRoutes);
-router.use("/api/images", imageRoutes);
-router.use("/api/vendor/auth", vendorAuthRoutes);
-router.use("/api/vendor/products", vendorRoutes);
+// Mount routes (API_PREFIX already includes /api/ai-fashion-generator)
+router.use("/public", publicRoutes);
+router.use("/admin/auth", authRoutes);
+router.use("/admin/products", adminRoutes);
+router.use("/search", searchRoutes);
+router.use("/images", imageRoutes);
+router.use("/vendor/auth", vendorAuthRoutes);
+router.use("/vendor/products", vendorRoutes);
 
 export default router;

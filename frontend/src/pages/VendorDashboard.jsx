@@ -52,7 +52,7 @@ export default function VendorDashboard() {
   const loadProducts = async () => {
     setProductsLoading(true);
     try {
-      const response = await vendorApi.get("/api/vendor/products");
+      const response = await vendorApi.get("/vendor/products");
       setProducts(response.data || []);
     } catch (err) {
       console.error("Failed to load products:", err);
@@ -71,7 +71,10 @@ export default function VendorDashboard() {
     if (!incoming.length) return;
     setError("");
     setFiles((prev) => {
-      const merged = [...prev, ...incoming.map((file) => ({ id: crypto.randomUUID(), file }))];
+      const merged = [
+        ...prev,
+        ...incoming.map((file) => ({ id: crypto.randomUUID(), file })),
+      ];
       return merged.slice(0, MAX_FILES);
     });
   };
@@ -109,7 +112,9 @@ export default function VendorDashboard() {
 
     try {
       const formData = new FormData();
-      files.forEach((entry) => formData.append("images", entry.file, entry.file.name));
+      files.forEach((entry) =>
+        formData.append("images", entry.file, entry.file.name),
+      );
 
       const response = await fetch(`${API_BASE_URL}${API_PREFIX}/api/jobs`, {
         method: "POST",

@@ -22,7 +22,7 @@ export default function SearchPage() {
 
   const loadAvailableColors = async () => {
     try {
-      const response = await api.get("/api/search/colors");
+      const response = await api.get("/search/colors");
       setAvailableColors(response.data || []);
     } catch (err) {
       console.error("Failed to load colors:", err);
@@ -31,7 +31,7 @@ export default function SearchPage() {
 
   const loadAvailableCategories = async () => {
     try {
-      const response = await api.get("/api/search/categories");
+      const response = await api.get("/search/categories");
       setAvailableCategories(response.data || []);
     } catch (err) {
       console.error("Failed to load categories:", err);
@@ -62,7 +62,7 @@ export default function SearchPage() {
         searchParams.category = categoryFilter;
       }
 
-      const response = await api.post("/api/search/products", searchParams);
+      const response = await api.post("/search/products", searchParams);
       setResults(response.data || []);
       setPagination(response.pagination || {});
     } catch (err) {
@@ -94,7 +94,7 @@ export default function SearchPage() {
         searchParams.category = categoryFilter;
       }
 
-      const response = await api.post("/api/search/products", searchParams);
+      const response = await api.post("/search/products", searchParams);
       setResults(response.data || []);
       setPagination(response.pagination || {});
       setPage(pageNum);
