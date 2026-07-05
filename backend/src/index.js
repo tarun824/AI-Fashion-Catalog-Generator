@@ -15,7 +15,7 @@ const API_PREFIX = process.env.API_PREFIX ?? "/api/ai-fashion-generator";
 const allowedOrigins = [
   "https://ai-fashion-catalog-generator-tfec.vercel.app",
   "https://tarun.software",
-  "http://localhost:5173",
+  "https://www.tarun.software",
 ];
 
 if (process.env.ALLOWED_ORIGINS) {
