@@ -26,7 +26,6 @@ const productSchema = new Schema(
       type: String,
       unique: true,
       required: true,
-      index: true,
     },
 
     // URL-friendly slug (for public product pages)
@@ -35,7 +34,6 @@ const productSchema = new Schema(
       unique: true,
       trim: true,
       lowercase: true,
-      index: true,
     },
 
     // Product name
