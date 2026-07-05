@@ -32,7 +32,7 @@ export default function ProductEdit() {
 
   const loadProduct = async () => {
     try {
-      const response = await api.get(`/api/admin/products/${id}`);
+      const response = await api.get(`/admin/products/${id}`);
       const product = response.data;
       setFormData({
         name: product.name || "",
@@ -85,7 +85,7 @@ export default function ProductEdit() {
         },
       };
 
-      await api.put(`/api/admin/products/${id}`, updateData);
+      await api.put(`/admin/products/${id}`, updateData);
       navigate(`/dashboard/products/${id}`);
     } catch (err) {
       setError(err.message);

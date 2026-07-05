@@ -19,7 +19,7 @@ export function VendorAuthProvider({ children }) {
     }
 
     try {
-      const response = await vendorApi.get("/api/vendor/auth/me");
+      const response = await vendorApi.get("/vendor/auth/me");
       setVendor(response.data.vendor);
     } catch (error) {
       console.error("Vendor auth check failed:", error);
@@ -30,7 +30,7 @@ export function VendorAuthProvider({ children }) {
   };
 
   const login = async (email, password) => {
-    const response = await vendorApi.post("/api/vendor/auth/login", {
+    const response = await vendorApi.post("/vendor/auth/login", {
       email,
       password,
     });
@@ -41,7 +41,7 @@ export function VendorAuthProvider({ children }) {
   };
 
   const register = async ({ email, password, businessName, contactPhone }) => {
-    const response = await vendorApi.post("/api/vendor/auth/register", {
+    const response = await vendorApi.post("/vendor/auth/register", {
       email,
       password,
       businessName,

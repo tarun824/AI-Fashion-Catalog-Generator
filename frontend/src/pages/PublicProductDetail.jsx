@@ -20,7 +20,7 @@ const PublicProductDetail = () => {
   const loadProduct = async () => {
     setLoading(true);
     try {
-      const response = await api.get(`/api/public/products/${slug}`);
+      const response = await api.get(`/public/products/${slug}`);
       setProduct(response.data.product);
     } catch (error) {
       console.error("Error loading product:", error);

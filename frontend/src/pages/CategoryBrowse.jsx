@@ -34,7 +34,7 @@ const CategoryBrowse = () => {
 
   const loadCategory = async () => {
     try {
-      const response = await api.get(`/api/public/categories/${slug}`);
+      const response = await api.get(`/public/categories/${slug}`);
       setCategory(response.data.category);
     } catch (error) {
       console.error("Error loading category:", error);
@@ -52,7 +52,7 @@ const CategoryBrowse = () => {
         ...filters,
       };
 
-      const response = await api.get("/api/public/products", { params });
+      const response = await api.get("/public/products", { params });
 
       setProducts(response.data.products);
       setPagination(response.data.pagination);

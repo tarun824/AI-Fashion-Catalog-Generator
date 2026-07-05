@@ -19,7 +19,7 @@ export function AuthProvider({ children }) {
     }
 
     try {
-      const response = await api.get("/api/admin/auth/me");
+      const response = await api.get("/admin/auth/me");
       setAdmin(response.data.admin);
     } catch (error) {
       console.error("Auth check failed:", error);
@@ -30,7 +30,7 @@ export function AuthProvider({ children }) {
   };
 
   const login = async (email, password) => {
-    const response = await api.post("/api/admin/auth/login", {
+    const response = await api.post("/admin/auth/login", {
       email,
       password,
     });
@@ -46,7 +46,7 @@ export function AuthProvider({ children }) {
   };
 
   const changePassword = async (currentPassword, newPassword) => {
-    await api.post("/api/admin/auth/change-password", {
+    await api.post("/admin/auth/change-password", {
       currentPassword,
       newPassword,
     });

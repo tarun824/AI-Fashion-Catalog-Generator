@@ -13,7 +13,7 @@ export default function DashboardOverview() {
 
   const loadStats = async () => {
     try {
-      const response = await api.get("/api/admin/products/stats/summary");
+      const response = await api.get("/admin/products/stats/summary");
       setStats(response.data);
     } catch (err) {
       setError(err.message);

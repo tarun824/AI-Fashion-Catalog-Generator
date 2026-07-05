@@ -30,7 +30,7 @@ export default function Products() {
 
   const loadCategories = async () => {
     try {
-      const response = await api.get("/api/search/categories");
+      const response = await api.get("/search/categories");
       setCategories(response.data || []);
     } catch (err) {
       console.error("Failed to load categories:", err);
@@ -61,7 +61,7 @@ export default function Products() {
         params.append("category", categoryFilter);
       }
 
-      const response = await api.get(`/api/admin/products?${params}`);
+      const response = await api.get(`/admin/products?${params}`);
       setProducts(response.data);
       setPagination(response.pagination);
     } catch (err) {
@@ -82,7 +82,7 @@ export default function Products() {
     if (!confirm(`Delete ${selectedProducts.length} product(s)?`)) return;
 
     try {
-      await api.post("/api/admin/products/bulk-delete", {
+      await api.post("/admin/products/bulk-delete", {
         ids: selectedProducts,
       });
       setSelectedProducts([]);
@@ -96,7 +96,7 @@ export default function Products() {
     if (!selectedProducts.length) return;
 
     try {
-      await api.patch("/api/admin/products/bulk-status", {
+      await api.patch("/admin/products/bulk-status", {
         ids: selectedProducts,
         status,
       });
@@ -111,7 +111,7 @@ export default function Products() {
     if (!confirm("Delete this product?")) return;
 
     try {
-      await api.delete(`/api/admin/products/${productId}`);
+      await api.delete(`/admin/products/${productId}`);
       loadProducts();
     } catch (err) {
       alert("Failed to delete product: " + err.message);
