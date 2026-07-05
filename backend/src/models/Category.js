@@ -23,7 +23,6 @@ const categorySchema = new Schema(
       unique: true,
       trim: true,
       lowercase: true,
-      index: true,
     },
 
     // Parent category for hierarchical structure

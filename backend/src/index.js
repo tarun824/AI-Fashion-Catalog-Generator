@@ -16,8 +16,6 @@ const allowedOrigins = [
   `https://ai-fashion-catalog-generator-tfec.vercel.app`,
   `https://tarun.software`,
   "https://tarun.software/app/ai-fashion-generator",
-  "http://localhost:5173",
-  "http://localhost:5173/app/ai-fashion-generator/",
 ];
 
 if (process.env.ALLOWED_ORIGINS) {
