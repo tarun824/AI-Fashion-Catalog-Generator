@@ -4,6 +4,10 @@ import { VendorAuthProvider } from "./contexts/VendorAuthContext";
 import ProtectedRoute from "./components/ProtectedRoute";
 import VendorProtectedRoute from "./components/VendorProtectedRoute";
 
+// Layouts
+import PublicLayout from "./layouts/PublicLayout";
+import DashboardLayout from "./layouts/DashboardLayout";
+
 // Public Storefront Pages
 import PublicHome from "./pages/PublicHome";
 import CategoryBrowse from "./pages/CategoryBrowse";
@@ -11,7 +15,6 @@ import PublicProductDetail from "./pages/PublicProductDetail";
 
 // Admin Pages
 import Login from "./pages/Login";
-import DashboardLayout from "./layouts/DashboardLayout";
 import DashboardOverview from "./pages/DashboardOverview";
 import Products from "./pages/Products";
 import ProductDetail from "./pages/ProductDetail";
@@ -29,11 +32,13 @@ function App() {
       <VendorAuthProvider>
         <BrowserRouter basename="/app/ai-fashion-generator">
           <Routes>
-            {/* PUBLIC STOREFRONT - Main Site */}
-            <Route path="/" element={<PublicHome />} />
-            <Route path="/browse" element={<CategoryBrowse />} />
-            <Route path="/category/:slug" element={<CategoryBrowse />} />
-            <Route path="/product/:slug" element={<PublicProductDetail />} />
+            {/* PUBLIC STOREFRONT - Main Site with Layout */}
+            <Route element={<PublicLayout />}>
+              <Route path="/" element={<PublicHome />} />
+              <Route path="/browse" element={<CategoryBrowse />} />
+              <Route path="/category/:slug" element={<CategoryBrowse />} />
+              <Route path="/product/:slug" element={<PublicProductDetail />} />
+            </Route>
 
             {/* ADMIN PORTAL - Authentication */}
             <Route path="/admin/login" element={<Login />} />
