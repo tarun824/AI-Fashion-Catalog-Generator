@@ -113,9 +113,9 @@ export default function SearchPage() {
         limit,
       });
 
-      setResults(response.data.data || []);
-      setPagination(response.data.pagination || {});
-      setParsedFilters(response.data.parsedFilters || null);
+      setResults(response.data || []);
+      setPagination(response.pagination || []);
+      setParsedFilters(response.parsedFilters || null);
     } catch (err) {
       console.error("Natural search failed:", err);
     } finally {
@@ -164,8 +164,8 @@ export default function SearchPage() {
       }
 
       const response = await api.post("/search/products", searchParams);
-      setResults(response.data.data || []);
-      setPagination(response.data.pagination || {});
+      setResults(response.data || []);
+      setPagination(response.pagination || []);
     } catch (err) {
       console.error("Search failed:", err);
     } finally {
@@ -183,8 +183,8 @@ export default function SearchPage() {
           page: pageNum,
           limit,
         });
-        setResults(response.data.data || []);
-        setPagination(response.data.pagination || {});
+        setResults(response.data || []);
+        setPagination(response.pagination || []);
       } else {
         const searchParams = {
           page: pageNum,
@@ -215,8 +215,8 @@ export default function SearchPage() {
         }
 
         const response = await api.post("/search/products", searchParams);
-        setResults(response.data.data || []);
-        setPagination(response.data.pagination || {});
+        setResults(response.data || []);
+        setPagination(response.pagination || []);
       }
       setPage(pageNum);
     } catch (err) {

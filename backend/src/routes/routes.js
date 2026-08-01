@@ -11,6 +11,14 @@ import imageRoutes from "./imageRoutes.js";
 import vendorAuthRoutes from "./vendorAuthRoutes.js";
 import vendorRoutes from "./vendorRoutes.js";
 import publicRoutes from "./publicRoutes.js";
+import analyticsRoutes from "./analyticsRoutes.js";
+import orderRoutes from "./orderRoutes.js";
+import customerRoutes from "./customerRoutes.js";
+import inventoryRoutes from "./inventoryRoutes.js";
+import shippingRoutes from "./shippingRoutes.js";
+import integrationRoutes from "./integrationRoutes.js";
+import setupRoutes from "./setupRoutes.js";
+import aiRoutes from "./aiRoutes.js";
 import { flexibleAuthMiddleware } from "../middleware/auth.js";
 
 const router = express.Router();
@@ -185,9 +193,17 @@ router.get("/jobs/:jobId/export", async (req, res) => {
 });
 
 // Mount routes (API_PREFIX already includes /api/ai-fashion-generator)
+router.use("/ai", aiRoutes);
 router.use("/public", publicRoutes);
 router.use("/admin/auth", authRoutes);
+router.use("/admin/analytics", analyticsRoutes);
 router.use("/admin/products", adminRoutes);
+router.use("/admin/orders", orderRoutes);
+router.use("/admin/customers", customerRoutes);
+router.use("/admin/inventory", inventoryRoutes);
+router.use("/admin/shipping", shippingRoutes);
+router.use("/admin/integrations", integrationRoutes);
+router.use("/admin/setup", setupRoutes);
 router.use("/search", searchRoutes);
 router.use("/images", imageRoutes);
 router.use("/vendor/auth", vendorAuthRoutes);

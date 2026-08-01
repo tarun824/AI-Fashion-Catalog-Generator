@@ -13,7 +13,8 @@ const PublicHome = () => {
       <section className="hero-section">
         <div className="hero-content">
           <h1 className="hero-title">
-            Timeless Elegance for Your Special Moments
+            {import.meta.env.VITE_STORE_TAGLINE || "Timeless Elegance"} for Your
+            Special Moments
           </h1>
           <p className="hero-subtitle">
             Discover Handcrafted Sarees for Every Celebration

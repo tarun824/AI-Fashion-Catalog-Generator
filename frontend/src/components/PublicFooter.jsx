@@ -3,19 +3,32 @@ import { Link } from "react-router-dom";
 import "../styles/PublicFooter.css";
 
 const PublicFooter = () => {
+  // Environment variables for branding and contact info
+  const storeName = import.meta.env.VITE_STORE_NAME || "SAREE HERITAGE";
+  const supportEmail =
+    import.meta.env.VITE_SUPPORT_EMAIL || "support@yourstore.com";
+  const whatsappPhone = import.meta.env.VITE_WHATSAPP_PHONE || "919876543210";
+  const facebookUrl =
+    import.meta.env.VITE_FACEBOOK_URL || "https://facebook.com";
+  const instagramUrl =
+    import.meta.env.VITE_INSTAGRAM_URL || "https://instagram.com";
+  const twitterUrl = import.meta.env.VITE_TWITTER_URL || "https://twitter.com";
+  const pinterestUrl =
+    import.meta.env.VITE_PINTEREST_URL || "https://pinterest.com";
+
   return (
     <footer className="public-footer">
       <div className="footer-content">
         {/* About Section */}
         <div className="footer-column">
-          <h3 className="footer-title">SAREE HERITAGE</h3>
+          <h3 className="footer-title">{storeName}</h3>
           <p className="footer-about">
             Discover the finest collection of handcrafted sarees from across
             India. Traditional elegance meets modern sophistication.
           </p>
           <div className="social-links">
             <a
-              href="https://facebook.com"
+              href={facebookUrl}
               target="_blank"
               rel="noopener noreferrer"
               className="social-icon"
@@ -23,7 +36,7 @@ const PublicFooter = () => {
               📘
             </a>
             <a
-              href="https://instagram.com"
+              href={instagramUrl}
               target="_blank"
               rel="noopener noreferrer"
               className="social-icon"
@@ -31,7 +44,7 @@ const PublicFooter = () => {
               📷
             </a>
             <a
-              href="https://twitter.com"
+              href={twitterUrl}
               target="_blank"
               rel="noopener noreferrer"
               className="social-icon"
@@ -39,7 +52,7 @@ const PublicFooter = () => {
               🐦
             </a>
             <a
-              href="https://pinterest.com"
+              href={pinterestUrl}
               target="_blank"
               rel="noopener noreferrer"
               className="social-icon"
@@ -130,12 +143,12 @@ const PublicFooter = () => {
           <div className="contact-info">
             <p>📞 +91 98765 43210</p>
             <p>📱 +91 98765 43211</p>
-            <p>✉️ support@yourstore.com</p>
+            <p>✉️ {supportEmail}</p>
             <p>📍 Mumbai, Maharashtra, India</p>
           </div>
           <div className="whatsapp-footer">
             <a
-              href="https://wa.me/919876543210"
+              href={`https://wa.me/${whatsappPhone}`}
               target="_blank"
               rel="noopener noreferrer"
               className="whatsapp-link"
@@ -149,7 +162,7 @@ const PublicFooter = () => {
       {/* Bottom Bar */}
       <div className="footer-bottom">
         <div className="footer-bottom-content">
-          <p>&copy; 2026 Saree Heritage. All rights reserved.</p>
+          <p>&copy; 2026 {storeName}. All rights reserved.</p>
           <div className="footer-bottom-links">
             <a href="/privacy">Privacy Policy</a>
             <a href="/terms">Terms & Conditions</a>

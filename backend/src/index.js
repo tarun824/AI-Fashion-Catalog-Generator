@@ -12,11 +12,7 @@ const app = express();
 const port = process.env.PORT || 5000;
 const API_PREFIX = process.env.API_PREFIX ?? "/api/ai-fashion-generator";
 
-const allowedOrigins = [
-  "https://ai-fashion-catalog-generator-tfec.vercel.app",
-  "https://tarun.software",
-  "https://www.tarun.software",
-];
+const allowedOrigins = [];
 
 if (process.env.ALLOWED_ORIGINS) {
   allowedOrigins.push(

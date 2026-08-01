@@ -3,7 +3,7 @@ import "../styles/WhatsAppFloat.css";
 
 const WhatsAppFloat = () => {
   const handleClick = () => {
-    const phoneNumber = "919876543210"; // Update with actual number
+    const phoneNumber = import.meta.env.VITE_WHATSAPP_PHONE || "919876543210";
     const message = encodeURIComponent(
       "Hi! I'm interested in your saree collection. Can you help me?",
     );

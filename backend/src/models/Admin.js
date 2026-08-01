@@ -41,6 +41,30 @@ const adminSchema = new Schema(
     },
 
     lastLogin: Date,
+
+    // Setup/Onboarding Progress
+    setupChecklist: {
+      uploadedProducts: {
+        type: Boolean,
+        default: false,
+      },
+      publishedProduct: {
+        type: Boolean,
+        default: false,
+      },
+      configuredStore: {
+        type: Boolean,
+        default: false,
+      },
+      invitedVendor: {
+        type: Boolean,
+        default: false,
+      },
+      firstOrder: {
+        type: Boolean,
+        default: false,
+      },
+    },
   },
   {
     timestamps: true,

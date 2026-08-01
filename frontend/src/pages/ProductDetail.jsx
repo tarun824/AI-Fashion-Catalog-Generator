@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { api } from "../utils/api";
 import { format } from "date-fns";
+import ShareModal from "../components/ShareModal";
 
 export default function ProductDetail() {
   const { id } = useParams();
@@ -15,6 +16,9 @@ export default function ProductDetail() {
     stock: "",
   });
   const [savingVariant, setSavingVariant] = useState(false);
+
+  // Share modal state
+  const [shareModalOpen, setShareModalOpen] = useState(false);
 
   useEffect(() => {
     loadProduct();
@@ -142,12 +146,19 @@ export default function ProductDetail() {
           >
             ← Back to Products
           </Link>
-          <h2 className="text-3xl font-bold text-gray-900">{product.name}</h2>
-          <p className="text-gray-600 mt-1">
+          <h2 className="text-3xl font-bold text-gray-900 dark:text-white">
+            {product.name}
+          </h2>
+          <p className="text-gray-600 dark:text-gray-400 mt-1">
             SKU: {product.sku}
             {product.category && <> • {product.category}</>}
             {product.price?.amount != null && <> • ₹{product.price.amount}</>}
           </p>
+          {product.slug && (
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1 font-mono">
+              🔗 Public URL: /products/{product.slug}
+            </p>
+          )}
         </div>
         <div className="flex space-x-2">
           <Link
@@ -156,6 +167,16 @@ export default function ProductDetail() {
           >
             Edit
           </Link>
+          {product.slug && (
+            <button
+              onClick={() => setShareModalOpen(true)}
+              className="px-4 py-2 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 transition flex items-center gap-2"
+              title="Share product with QR code"
+            >
+              <span>🔗</span>
+              Share Product
+            </button>
+          )}
           <button
             onClick={handleDelete}
             className="px-4 py-2 bg-red-600 text-white font-medium rounded-lg hover:bg-red-700 transition"
@@ -614,6 +635,17 @@ export default function ProductDetail() {
           </div>
         </div>
       </div>
+
+      {/* Share Modal */}
+      {product.slug && (
+        <ShareModal
+          isOpen={shareModalOpen}
+          onClose={() => setShareModalOpen(false)}
+          productName={product.name}
+          productSlug={product.slug}
+          productPrice={product.price?.amount || 0}
+        />
+      )}
     </div>
   );
 }

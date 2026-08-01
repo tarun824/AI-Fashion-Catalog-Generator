@@ -6,7 +6,7 @@ import WhatsAppFloat from "../components/WhatsAppFloat";
 
 const PublicLayout = () => {
   return (
-    <div className="public-layout">
+    <div className="public-layout bg-white dark:bg-gray-900 transition-colors min-h-screen">
       <PublicHeader />
       <main className="public-main">
         <Outlet />

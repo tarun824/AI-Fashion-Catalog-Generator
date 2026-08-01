@@ -28,16 +28,30 @@ const CategoryBrowse = () => {
   });
 
   useEffect(() => {
-    loadCategory();
+    // Only load category if we have a slug (specific category page)
+    if (slug) {
+      loadCategory();
+    } else {
+      // For /browse route (all products), set a default category
+      setCategory({
+        name: "All Products",
+        description: "Browse our entire collection",
+      });
+    }
     loadProducts();
   }, [slug, filters, pagination.page]);
 
   const loadCategory = async () => {
     try {
       const response = await api.get(`/public/categories/${slug}`);
-      setCategory(response.data.category);
+      setCategory(response.category);
     } catch (error) {
       console.error("Error loading category:", error);
+      // Set default if category load fails
+      setCategory({
+        name: "All Products",
+        description: "Browse our entire collection",
+      });
     }
   };
 
@@ -45,19 +59,31 @@ const CategoryBrowse = () => {
     setLoading(true);
     try {
       const params = {
-        category: slug,
         page: pagination.page,
         limit: pagination.limit,
         sort: filters.sort,
         ...filters,
       };
 
+      // Only add category filter if we have a slug
+      if (slug) {
+        params.category = slug;
+      }
+
       const response = await api.get("/public/products", { params });
 
-      setProducts(response.data.products);
-      setPagination(response.data.pagination);
+      setProducts(response.products || []);
+      setPagination(
+        response.pagination || {
+          page: 1,
+          limit: 24,
+          total: 0,
+          pages: 0,
+        },
+      );
     } catch (error) {
       console.error("Error loading products:", error);
+      setProducts([]);
     } finally {
       setLoading(false);
     }
@@ -152,7 +178,7 @@ const ProductCard = ({ product }) => {
     : "/placeholder-saree.jpg";
 
   return (
-    <Link to={`/product/${product.slug}`} className="product-card">
+    <Link to={`/products/${product.slug}`} className="product-card">
       <div className="product-image">
         <img src={imageUrl} alt={product.name} />
         {!product.inStock && (
