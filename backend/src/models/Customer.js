@@ -250,7 +250,7 @@ const customerSchema = new Schema(
 );
 
 // Indexes for Performance (compound/special indexes only - single field indexes are defined inline with unique/sparse)
-customerSchema.index({ email: 1 }, { sparse: true }); // sparse index for optional email
+// Note: email index removed - already defined with sparse: true inline
 customerSchema.index({ customerType: 1 });
 customerSchema.index({ totalSpent: -1 });
 customerSchema.index({ lastPurchaseDate: -1 });

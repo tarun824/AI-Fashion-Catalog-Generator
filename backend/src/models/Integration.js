@@ -246,8 +246,8 @@ integrationSchema.statics.getActiveByCategory = function (category) {
 };
 
 // ==================== INDEXES ====================
+// Note: name index removed - already defined with unique: true inline
 
-integrationSchema.index({ name: 1 });
 integrationSchema.index({ category: 1, status: 1 });
 integrationSchema.index({ status: 1 });
 
