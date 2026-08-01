@@ -419,7 +419,30 @@ class ShiprocketService {
         courierId: response.courier_company_id,
       };
     } catch (error) {
-      throw new Error(`Failed to assign courier: ${error.message}`);
+      // Extract Shiprocket-specific error message
+      const shiprocketMessage = error.response?.data?.message || error.message;
+      const statusCode = error.response?.status;
+
+      // Create detailed error object
+      const detailedError = new Error(shiprocketMessage);
+      detailedError.statusCode = statusCode;
+      detailedError.isShiprocketError = true;
+      detailedError.originalError = error.response?.data;
+
+      // Detect common error types
+      if (shiprocketMessage.includes("KYC")) {
+        detailedError.errorType = "KYC_REQUIRED";
+        detailedError.actionRequired =
+          "Complete KYC verification in Shiprocket dashboard";
+      } else if (shiprocketMessage.includes("insufficient balance")) {
+        detailedError.errorType = "INSUFFICIENT_BALANCE";
+        detailedError.actionRequired = "Add funds to Shiprocket account";
+      } else if (shiprocketMessage.includes("pickup location")) {
+        detailedError.errorType = "PICKUP_LOCATION_ERROR";
+        detailedError.actionRequired = "Verify pickup location settings";
+      }
+
+      throw detailedError;
     }
   }
 

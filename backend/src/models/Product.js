@@ -258,7 +258,7 @@ const productSchema = new Schema(
       processingTime: Number,
     },
 
-    // Product status (admin view)
+    // Product status: draft (hidden), published (visible), archived (hidden)
     status: {
       type: String,
       enum: ["draft", "published", "archived"],
@@ -266,14 +266,7 @@ const productSchema = new Schema(
       index: true,
     },
 
-    // Public visibility flag
-    isPublished: {
-      type: Boolean,
-      default: false,
-      index: true,
-    },
-
-    // When product was made public
+    // When product was first published
     publishedAt: {
       type: Date,
       index: true,
@@ -354,6 +347,40 @@ const productSchema = new Schema(
       type: Date,
       default: null,
     },
+
+    // Merge history - tracks products that were merged into this one
+    mergeHistory: [
+      {
+        mergedFrom: {
+          type: Schema.Types.ObjectId,
+          ref: "Product",
+        },
+        mergedFromSku: {
+          type: String,
+          trim: true,
+        },
+        mergedAt: {
+          type: Date,
+          default: Date.now,
+        },
+        mergedBy: {
+          type: String,
+          trim: true,
+        },
+      },
+    ],
+
+    // Soft delete fields
+    deletedAt: {
+      type: Date,
+      default: null,
+      index: true,
+    },
+    deletedReason: {
+      type: String,
+      trim: true,
+      default: null,
+    },
   },
   {
     timestamps: true,
@@ -361,12 +388,11 @@ const productSchema = new Schema(
   },
 );
 
-// Indexes for efficient querying
+// Indexes for efficient querying (compound indexes only - single field indexes are defined inline)
 productSchema.index({ status: 1, createdAt: -1 });
-productSchema.index({ isPublished: 1, publishedAt: -1 });
-productSchema.index({ "categories.categoryId": 1, isPublished: 1 });
-productSchema.index({ slug: 1 });
-// Note: colors.names and colors.families indexes removed because they're already defined inline
+productSchema.index({ status: 1, publishedAt: -1 });
+productSchema.index({ "categories.categoryId": 1, status: 1 });
+// Note: slug index removed - already defined with unique: true inline
 
 // Helper: Generate short random code for slug uniqueness
 const generateRandomCode = (length = 6) => {
@@ -487,6 +513,31 @@ productSchema.virtual("imageUrls").get(function () {
   };
 });
 
+// Virtual: Map imageGallery to images.gallery for frontend compatibility
+productSchema.virtual("images.gallery").get(function () {
+  // If imageGallery exists and has images, return it
+  if (this.imageGallery && this.imageGallery.length > 0) {
+    return this.imageGallery;
+  }
+
+  // Fallback: Convert legacy single image to gallery format
+  if (this.images?.original?.gridFsId) {
+    return [
+      {
+        gridFsId: this.images.original.gridFsId,
+        thumbnailGridFsId:
+          this.images.thumbnail?.gridFsId || this.images.original.gridFsId,
+        order: 0,
+        alt: this.name || "",
+        isPrimary: true,
+      },
+    ];
+  }
+
+  // No images at all
+  return [];
+});
+
 // Virtual: total stock across all variants
 productSchema.virtual("totalStock").get(function () {
   if (!this.variants || this.variants.length === 0) return null;
@@ -533,8 +584,8 @@ productSchema.statics.searchProducts = async function (filters = {}) {
     };
   }
 
-  // Status filter
-  if (filters.status) {
+  // Status filter (skip if "all" to return all statuses)
+  if (filters.status && filters.status !== "all") {
     query.status = filters.status;
   }
 
@@ -611,11 +662,35 @@ productSchema.statics.searchProducts = async function (filters = {}) {
     const totalStock = product.variants?.length
       ? product.variants.reduce((sum, v) => sum + (v.stock || 0), 0)
       : null;
+
+    // Manually compute images.gallery virtual (since .lean() skips virtuals)
+    let imagesGallery = [];
+    if (product.imageGallery && product.imageGallery.length > 0) {
+      imagesGallery = product.imageGallery;
+    } else if (product.images?.original?.gridFsId) {
+      // Fallback: Convert legacy single image to gallery format
+      imagesGallery = [
+        {
+          gridFsId: product.images.original.gridFsId,
+          thumbnailGridFsId:
+            product.images.thumbnail?.gridFsId ||
+            product.images.original.gridFsId,
+          order: 0,
+          alt: product.name || "",
+          isPrimary: true,
+        },
+      ];
+    }
+
     return {
       ...product,
       totalStock,
       isLowStock:
         totalStock != null && totalStock <= (product.lowStockThreshold ?? 5),
+      images: {
+        ...product.images,
+        gallery: imagesGallery,
+      },
     };
   });
 

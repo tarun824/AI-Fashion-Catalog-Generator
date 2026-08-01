@@ -1,4 +1,5 @@
 import express from "express";
+import mongoose from "mongoose";
 import Order from "../models/Order.js";
 import Product from "../models/Product.js";
 import Customer from "../models/Customer.js";
@@ -81,6 +82,14 @@ router.get("/stats", async (req, res) => {
  */
 router.get("/:id", async (req, res) => {
   try {
+    // Validate ObjectId
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({
+        success: false,
+        error: "Invalid order ID format",
+      });
+    }
+
     const order = await Order.findById(req.params.id)
       .populate("createdBy", "name email")
       .populate("vendorId", "businessName email")

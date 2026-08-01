@@ -6,6 +6,7 @@ import router from "./routes/routes.js";
 import { connectDatabase } from "./config/database.js";
 import Admin from "./models/Admin.js";
 import { applySecurityMiddleware } from "./middleware/security.js";
+import errorHandler from "./middleware/errorHandler.js";
 
 dotenv.config();
 
@@ -61,10 +62,8 @@ app.use(
 );
 app.use(API_PREFIX, router);
 
-app.use((err, _req, res, _next) => {
-  console.error(err);
-  res.status(500).json({ error: "Something went wrong." });
-});
+// Central error handler - MUST be last middleware
+app.use(errorHandler);
 
 // Create default admin user if none exists
 async function createDefaultAdmin() {

@@ -115,8 +115,7 @@ const categorySchema = new Schema(
   },
 );
 
-// Indexes
-categorySchema.index({ slug: 1 });
+// Indexes (compound indexes only - single field indexes are defined inline)
 categorySchema.index({ parentId: 1, sortOrder: 1 });
 categorySchema.index({ type: 1, isActive: 1, sortOrder: 1 });
 categorySchema.index({ isFeatured: 1, sortOrder: 1 });
@@ -176,7 +175,6 @@ categorySchema.statics.updateProductCount = async function (categoryId) {
 
   const count = await Product.countDocuments({
     "categories.categoryId": categoryId,
-    isPublished: true,
     status: "published",
   });
 

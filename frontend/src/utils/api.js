@@ -44,7 +44,16 @@ class ApiClient {
       const errorData = await response
         .json()
         .catch(() => ({ error: "Request failed" }));
-      throw new Error(errorData.error || `HTTP ${response.status}`);
+
+      // Create axios-like error structure for consistency
+      const error = new Error(errorData.error || `HTTP ${response.status}`);
+      error.response = {
+        status: response.status,
+        statusText: response.statusText,
+        data: errorData, // Contains: error, errorType, actionRequired, details, etc.
+      };
+
+      throw error;
     }
 
     const contentType = response.headers.get("content-type");

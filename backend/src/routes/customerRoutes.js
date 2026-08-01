@@ -1,4 +1,5 @@
 import express from "express";
+import mongoose from "mongoose";
 import Customer from "../models/Customer.js";
 import { authMiddleware } from "../middleware/auth.js";
 import {
@@ -202,6 +203,14 @@ router.get("/top", async (req, res) => {
  */
 router.get("/:id", async (req, res) => {
   try {
+    // Validate ObjectId to prevent errors with routes like /new
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({
+        success: false,
+        error: "Invalid customer ID format",
+      });
+    }
+
     const customer = await Customer.findById(req.params.id)
       .populate("referredBy", "name phone")
       .populate("notes.addedBy", "name email");
@@ -293,6 +302,14 @@ router.post("/", async (req, res) => {
  */
 router.patch("/:id", async (req, res) => {
   try {
+    // Validate ObjectId
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({
+        success: false,
+        error: "Invalid customer ID format",
+      });
+    }
+
     const {
       name,
       phone,
@@ -352,6 +369,14 @@ router.patch("/:id", async (req, res) => {
  */
 router.post("/:id/notes", async (req, res) => {
   try {
+    // Validate ObjectId
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({
+        success: false,
+        error: "Invalid customer ID format",
+      });
+    }
+
     const { text } = req.body;
 
     if (!text || !text.trim()) {
@@ -391,6 +416,17 @@ router.post("/:id/notes", async (req, res) => {
  */
 router.delete("/:id/notes/:noteId", async (req, res) => {
   try {
+    // Validate ObjectIds
+    if (
+      !mongoose.Types.ObjectId.isValid(req.params.id) ||
+      !mongoose.Types.ObjectId.isValid(req.params.noteId)
+    ) {
+      return res.status(400).json({
+        success: false,
+        error: "Invalid ID format",
+      });
+    }
+
     const customer = await Customer.findById(req.params.id);
     if (!customer) {
       return res.status(404).json({
@@ -529,6 +565,14 @@ router.post("/analyze-all", async (req, res) => {
  */
 router.delete("/:id", async (req, res) => {
   try {
+    // Validate ObjectId
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({
+        success: false,
+        error: "Invalid customer ID format",
+      });
+    }
+
     const customer = await Customer.findById(req.params.id);
     if (!customer) {
       return res.status(404).json({

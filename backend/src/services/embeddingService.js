@@ -1,12 +1,16 @@
-import { configDotenv } from "dotenv";
 import OpenAI from "openai";
 import sharp from "sharp";
 
-configDotenv();
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+// Lazy-loaded OpenAI client (initialized on first use, after dotenv loads)
+let openai = null;
+const getOpenAI = () => {
+  if (!openai) {
+    openai = new OpenAI({
+      apiKey: process.env.OPENAI_API_KEY,
+    });
+  }
+  return openai;
+};
 
 /**
  * Embedding Service
@@ -19,7 +23,7 @@ class EmbeddingService {
    */
   async generateTextEmbedding(text) {
     try {
-      const response = await openai.embeddings.create({
+      const response = await getOpenAI().embeddings.create({
         model: "text-embedding-3-small",
         input: text,
       });
@@ -41,7 +45,7 @@ class EmbeddingService {
       const base64Image = await this.prepareImageForAnalysis(imageBuffer);
 
       // Use GPT-4 Vision to get image features
-      const response = await openai.chat.completions.create({
+      const response = await getOpenAI().chat.completions.create({
         model: "gpt-4o-mini",
         messages: [
           {

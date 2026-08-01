@@ -29,21 +29,29 @@ router.post("/create-order", async (req, res) => {
 
     // Check if already created in Shiprocket
     if (order.shipping?.shiprocketOrderId) {
-      return res
-        .status(400)
-        .json({ error: "Order already created in Shiprocket" });
+      return res.status(200).json({
+        success: true,
+        message: "Order already created in Shiprocket",
+        alreadyExists: true,
+        data: {
+          shiprocketOrderId: order.shipping.shiprocketOrderId,
+          shipmentId: order.shipping.shipmentId,
+          status: order.shipping.status,
+        },
+      });
     }
 
     // Create in Shiprocket
     const shipment = await shiprocketService.createOrder(order, pickupLocation);
 
-    // Update order with Shiprocket details
+    // Update order with Shiprocket details and clear any errors
     order.shipping = {
       ...order.shipping,
       shiprocketOrderId: shipment.shiprocketOrderId,
       shipmentId: shipment.shipmentId,
       status: shipment.status,
       createdAt: new Date(),
+      lastError: null, // Clear error on success
     };
     await order.save();
 
@@ -54,6 +62,31 @@ router.post("/create-order", async (req, res) => {
     });
   } catch (error) {
     console.error("Error creating Shiprocket order:", error);
+
+    // Save error to order if orderId exists
+    try {
+      if (req.body.orderId) {
+        const order = await Order.findById(req.body.orderId);
+        if (order) {
+          order.shipping = {
+            ...order.shipping,
+            lastError: {
+              message: error.message,
+              stage: "create_order",
+              timestamp: new Date(),
+              details: {
+                stack: error.stack,
+                orderId: req.body.orderId,
+              },
+            },
+          };
+          await order.save();
+        }
+      }
+    } catch (saveError) {
+      console.error("Error saving error to order:", saveError);
+    }
+
     res.status(500).json({ error: error.message });
   }
 });
@@ -112,11 +145,12 @@ router.post("/assign-courier", async (req, res) => {
       courierId,
     );
 
-    // Update order
+    // Update order and clear any errors
     order.shipping = {
       ...order.shipping,
       ...awbDetails,
       courierAssignedAt: new Date(),
+      lastError: null, // Clear error on success
     };
     order.status = "processing";
     await order.save();
@@ -127,8 +161,55 @@ router.post("/assign-courier", async (req, res) => {
       data: awbDetails,
     });
   } catch (error) {
-    console.error("Error assigning courier:", error);
-    res.status(500).json({ error: error.message });
+    console.error("❌ Error assigning courier:", error);
+    console.error("❌ error.isShiprocketError:", error.isShiprocketError);
+    console.error("❌ error.message:", error.message);
+    console.error("❌ error.errorType:", error.errorType);
+    console.error("❌ error.actionRequired:", error.actionRequired);
+
+    // Save error to order if orderId exists
+    try {
+      if (req.body.orderId) {
+        const order = await Order.findById(req.body.orderId);
+        if (order) {
+          order.shipping = {
+            ...order.shipping,
+            lastError: {
+              message: error.message,
+              stage: "assign_courier",
+              timestamp: new Date(),
+              details: {
+                errorType: error.errorType,
+                actionRequired: error.actionRequired,
+                orderId: req.body.orderId,
+              },
+            },
+          };
+          await order.save();
+        }
+      }
+    } catch (saveError) {
+      console.error("Error saving error to order:", saveError);
+    }
+
+    // Handle Shiprocket-specific errors
+    if (error.isShiprocketError) {
+      const errorResponse = {
+        error: error.message,
+        errorType: error.errorType,
+        actionRequired: error.actionRequired,
+        details: error.originalError,
+      };
+      console.error("✅ Sending Shiprocket error response:", errorResponse);
+      return res.status(error.statusCode || 400).json(errorResponse);
+    }
+
+    // Generic error
+    const genericResponse = {
+      error: error.message || "Failed to assign courier",
+    };
+    console.error("✅ Sending generic error response:", genericResponse);
+    res.status(500).json(genericResponse);
   }
 });
 
@@ -203,11 +284,12 @@ router.post("/schedule-pickup", async (req, res) => {
       date,
     );
 
-    // Update order
+    // Update order and clear any errors
     order.shipping = {
       ...order.shipping,
       ...pickup,
       pickupScheduledAt: new Date(),
+      lastError: null, // Clear error on success
     };
     order.status = "processing";
     await order.save();
@@ -219,6 +301,30 @@ router.post("/schedule-pickup", async (req, res) => {
     });
   } catch (error) {
     console.error("Error scheduling pickup:", error);
+
+    // Save error to order if orderId exists
+    try {
+      if (req.body.orderId) {
+        const order = await Order.findById(req.body.orderId);
+        if (order) {
+          order.shipping = {
+            ...order.shipping,
+            lastError: {
+              message: error.message,
+              stage: "schedule_pickup",
+              timestamp: new Date(),
+              details: {
+                orderId: req.body.orderId,
+              },
+            },
+          };
+          await order.save();
+        }
+      }
+    } catch (saveError) {
+      console.error("Error saving error to order:", saveError);
+    }
+
     res.status(500).json({ error: error.message });
   }
 });

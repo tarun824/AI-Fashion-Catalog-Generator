@@ -3,6 +3,7 @@ import { useParams, useNavigate, Link } from "react-router-dom";
 import { api } from "../utils/api";
 import { format } from "date-fns";
 import ShareModal from "../components/ShareModal";
+import AddImagesModal from "../components/products/AddImagesModal";
 
 export default function ProductDetail() {
   const { id } = useParams();
@@ -19,6 +20,9 @@ export default function ProductDetail() {
 
   // Share modal state
   const [shareModalOpen, setShareModalOpen] = useState(false);
+
+  // Add images modal state
+  const [addImagesModalOpen, setAddImagesModalOpen] = useState(false);
 
   useEffect(() => {
     loadProduct();
@@ -95,6 +99,12 @@ export default function ProductDetail() {
     }
   };
 
+  const handleAddImagesSuccess = (updatedProduct) => {
+    setAddImagesModalOpen(false);
+    setProduct(updatedProduct);
+    alert("Images added successfully!");
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -156,7 +166,8 @@ export default function ProductDetail() {
           </p>
           {product.slug && (
             <p className="text-sm text-gray-500 dark:text-gray-400 mt-1 font-mono">
-              🔗 Public URL: /products/{product.slug}
+              🔗 Public URL: {import.meta.env.BASE_URL.replace(/\/$/, "")}
+              /products/{product.slug}
             </p>
           )}
         </div>
@@ -191,32 +202,83 @@ export default function ProductDetail() {
         <div className="lg:col-span-2 space-y-6">
           {/* Images */}
           {product.images?.original?.gridFsId && (
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                Images
-              </h3>
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                  Images
+                </h3>
+                <button
+                  onClick={() => setAddImagesModalOpen(true)}
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition flex items-center gap-2 text-sm"
+                >
+                  <svg
+                    className="w-4 h-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M12 4v16m8-8H4"
+                    />
+                  </svg>
+                  Add Images
+                </button>
+              </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <p className="text-sm text-gray-600 mb-2">Original</p>
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
+                    Original
+                  </p>
                   <img
                     src={api.getImageUrl(product.images.original.gridFsId)}
                     alt={product.name}
-                    className="w-full rounded-lg border border-gray-200"
+                    className="w-full rounded-lg border border-gray-200 dark:border-gray-700"
                   />
                 </div>
                 {product.images?.thumbnail?.gridFsId && (
                   <div>
-                    <p className="text-sm text-gray-600 mb-2">
+                    <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
                       Thumbnail (150x150)
                     </p>
                     <img
                       src={api.getImageUrl(product.images.thumbnail.gridFsId)}
                       alt={product.name}
-                      className="w-32 h-32 rounded-lg border border-gray-200"
+                      className="w-32 h-32 rounded-lg border border-gray-200 dark:border-gray-700"
                     />
                   </div>
                 )}
               </div>
+
+              {/* Image Gallery */}
+              {product.imageGallery && product.imageGallery.length > 0 && (
+                <div className="mt-6">
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
+                    Gallery ({product.imageGallery.length} images)
+                  </p>
+                  <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
+                    {product.imageGallery.map((img, index) => (
+                      <div
+                        key={img.gridFsId || index}
+                        className="relative aspect-square rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700"
+                      >
+                        <img
+                          src={api.getImageUrl(img.gridFsId)}
+                          alt={img.alt || `Gallery ${index + 1}`}
+                          className="w-full h-full object-cover"
+                        />
+                        {img.isPrimary && (
+                          <div className="absolute top-1 left-1 bg-blue-600 text-white text-xs font-bold px-2 py-1 rounded">
+                            PRIMARY
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -644,6 +706,15 @@ export default function ProductDetail() {
           productName={product.name}
           productSlug={product.slug}
           productPrice={product.price?.amount || 0}
+        />
+      )}
+
+      {/* Add Images Modal */}
+      {addImagesModalOpen && (
+        <AddImagesModal
+          product={product}
+          onClose={() => setAddImagesModalOpen(false)}
+          onSuccess={handleAddImagesSuccess}
         />
       )}
     </div>

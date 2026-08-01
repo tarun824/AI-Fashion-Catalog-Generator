@@ -342,7 +342,6 @@ router.get("/bundles", async (req, res) => {
   try {
     const products = await Product.find({
       status: "published",
-      isPublished: true,
     })
       .select("sku name price category occasion tags variants")
       .lean();
