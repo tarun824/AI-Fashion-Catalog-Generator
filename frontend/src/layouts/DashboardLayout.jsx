@@ -70,6 +70,12 @@ export default function DashboardLayout() {
     { path: "/admin/inventory", label: "Inventory AI", icon: "🤖" },
     { path: "/admin/orders", label: "Orders", icon: "📦" },
     { path: "/admin/customers", label: "Customers", icon: "👥" },
+    {
+      path: "/admin/smart-staging",
+      label: "Smart Staging",
+      icon: "🎯",
+      badge: "NEW",
+    },
     { path: "/admin/batch-upload", label: "Batch Upload", icon: "📤" },
     { path: "/admin/search", label: "Search", icon: "🔍" },
     { path: "/admin/integrations", label: "Integrations", icon: "🔌" },
@@ -240,7 +246,12 @@ export default function DashboardLayout() {
                 }`}
               >
                 <span className="text-xl">{item.icon}</span>
-                <span>{item.label}</span>
+                <span className="flex-1">{item.label}</span>
+                {item.badge && (
+                  <span className="px-2 py-0.5 text-xs font-semibold bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded-full">
+                    {item.badge}
+                  </span>
+                )}
               </Link>
             ))}
           </nav>

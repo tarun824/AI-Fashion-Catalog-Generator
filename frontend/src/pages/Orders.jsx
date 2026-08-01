@@ -427,12 +427,15 @@ export default function Orders() {
                       Status
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Shipping Stage
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Payment
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Date
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider sticky right-0 z-10 bg-gray-50 dark:bg-gray-900 shadow-[-2px_0_4px_rgba(0,0,0,0.05)]">
                       Actions
                     </th>
                   </tr>
@@ -474,6 +477,49 @@ export default function Orders() {
                         <OrderStatusBadge status={order.status} type="order" />
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm">
+                          {order.shipping?.lastError ? (
+                            <div className="flex flex-col">
+                              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                                ⚠️ Error
+                              </span>
+                              <span
+                                className="text-[10px] text-red-600 mt-1 max-w-[150px] truncate"
+                                title={order.shipping.lastError.message}
+                              >
+                                {order.shipping.lastError.message}
+                              </span>
+                            </div>
+                          ) : order.status === "delivered" ||
+                            order.shipping?.deliveredAt ? (
+                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                              🎉 Delivered
+                            </span>
+                          ) : order.shipping?.pickupScheduledAt ? (
+                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                              📅 Pickup Scheduled
+                            </span>
+                          ) : order.shipping?.awbCode ? (
+                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                              🚚 Courier Assigned
+                            </span>
+                          ) : order.shipping?.shiprocketOrderId ? (
+                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800">
+                              📦 Shipment Created
+                            </span>
+                          ) : order.status === "confirmed" ||
+                            order.status === "processing" ? (
+                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                              ✓ Ready to Ship
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
+                              ⏳ Not Started
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
                         <OrderStatusBadge
                           status={order.payment.status}
                           type="payment"
@@ -485,10 +531,10 @@ export default function Orders() {
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {format(new Date(order.createdAt), "MMM d, yyyy")}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm sticky right-0 z-10 bg-white dark:bg-gray-800 shadow-[-2px_0_4px_rgba(0,0,0,0.05)]">
                         <Link
                           to={`/admin/orders/${order._id}`}
-                          className="text-blue-600 hover:text-blue-900 mr-3"
+                          className="text-blue-600 dark:text-blue-400 hover:text-blue-900 dark:hover:text-blue-300 mr-3"
                         >
                           View
                         </Link>

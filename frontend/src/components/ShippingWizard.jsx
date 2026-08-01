@@ -10,7 +10,7 @@
  * 5. Done! (show tracking)
  */
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   X,
   Check,
@@ -22,6 +22,8 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { api } from "../utils/api";
+import { useToast } from "../contexts/ToastContext";
+import { formatErrorMessage, logApiError } from "../utils/errorHandler";
 
 export default function ShippingWizard({
   order,
@@ -29,6 +31,7 @@ export default function ShippingWizard({
   onClose,
   onSuccess,
 }) {
+  const toast = useToast();
   const [currentStep, setCurrentStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -71,37 +74,6 @@ export default function ShippingWizard({
   ];
 
   /**
-   * Step 1: Create Shiprocket Order
-   */
-  const createShiprocketOrder = async () => {
-    setLoading(true);
-    setError("");
-    try {
-      const response = await api.post("/admin/shipping/create-order", {
-        orderId: order._id,
-        pickupLocation: pickupLocation, // Use prop instead of hardcoded
-      });
-
-      setShippingData((prev) => ({
-        ...prev,
-        shiprocketOrderId:
-          response.shiprocketOrderId || response.data?.shiprocketOrderId,
-        shipmentId: response.shipmentId || response.data?.shipmentId,
-      }));
-
-      // Auto-fetch courier rates
-      await fetchCourierRates(
-        response.shiprocketOrderId || response.data?.shiprocketOrderId,
-      );
-      setCurrentStep(2);
-    } catch (error) {
-      setError(error.response?.data?.error || "Failed to create order");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  /**
    * Fetch available couriers
    */
   const fetchCourierRates = async (shiprocketOrderId) => {
@@ -125,6 +97,75 @@ export default function ShippingWizard({
   };
 
   /**
+   * Check on mount if order already exists in Shiprocket
+   * If yes, skip to step 2 (Select Courier)
+   */
+  useEffect(() => {
+    const checkExistingOrder = async () => {
+      if (shippingData.shiprocketOrderId) {
+        console.log("Order already exists in Shiprocket, skipping to step 2");
+        try {
+          await fetchCourierRates(shippingData.shiprocketOrderId);
+          setCurrentStep(2);
+          toast.info(
+            "Order already created in Shiprocket. Select courier to continue.",
+          );
+        } catch (error) {
+          console.error(
+            "Error fetching courier rates for existing order:",
+            error,
+          );
+        }
+      }
+    };
+
+    checkExistingOrder();
+  }, []); // Run only once on mount
+
+  /**
+   * Step 1: Create Shiprocket Order
+   */
+  const createShiprocketOrder = async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const response = await api.post("/admin/shipping/create-order", {
+        orderId: order._id,
+        pickupLocation: pickupLocation, // Use prop instead of hardcoded
+      });
+
+      const data = response.data || response;
+
+      setShippingData((prev) => ({
+        ...prev,
+        shiprocketOrderId:
+          data.shiprocketOrderId || data.data?.shiprocketOrderId,
+        shipmentId: data.shipmentId || data.data?.shipmentId,
+      }));
+
+      // If order already existed, show info message
+      if (data.alreadyExists) {
+        toast.info(
+          "Order already created in Shiprocket. Proceeding to courier selection.",
+        );
+      }
+
+      // Auto-fetch courier rates
+      await fetchCourierRates(
+        data.shiprocketOrderId || data.data?.shiprocketOrderId,
+      );
+      setCurrentStep(2);
+    } catch (error) {
+      const errorData = error.response?.data || {};
+      const errorMsg =
+        errorData.error || error.message || "Failed to create order";
+      setError(errorMsg);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  /**
    * Step 2: Assign Selected Courier
    */
   const assignCourier = async () => {
@@ -143,7 +184,10 @@ export default function ShippingWizard({
 
       setCurrentStep(3);
     } catch (error) {
-      setError(error.response?.data?.error || "Failed to assign courier");
+      const errorMsg = formatErrorMessage(error);
+      logApiError("Assign Courier", error);
+      setError(errorMsg);
+      toast.error(errorMsg, 8000); // Show for 8 seconds (longer for action items)
     } finally {
       setLoading(false);
     }
@@ -167,7 +211,12 @@ export default function ShippingWizard({
 
       setCurrentStep(4);
     } catch (error) {
-      setError(error.response?.data?.error || "Failed to generate label");
+      const errorData = error.response?.data || {};
+      const errorMsg =
+        errorData.error || error.message || "Failed to generate label";
+      setError(errorMsg);
+      toast.error(errorMsg);
+      console.error("Generate label error:", errorData);
     } finally {
       setLoading(false);
     }
@@ -194,7 +243,12 @@ export default function ShippingWizard({
       // Success!
       onSuccess && onSuccess();
     } catch (error) {
-      setError(error.response?.data?.error || "Failed to schedule pickup");
+      const errorData = error.response?.data || {};
+      const errorMsg =
+        errorData.error || error.message || "Failed to schedule pickup";
+      setError(errorMsg);
+      toast.error(errorMsg);
+      console.error("Schedule pickup error:", errorData);
     } finally {
       setLoading(false);
     }
@@ -290,7 +344,9 @@ export default function ShippingWizard({
               <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
               <div className="flex-1">
                 <p className="text-red-800 font-medium">Error</p>
-                <p className="text-red-600 text-sm mt-1">{error}</p>
+                <p className="text-red-600 text-sm mt-1 whitespace-pre-line">
+                  {error}
+                </p>
               </div>
             </div>
           )}

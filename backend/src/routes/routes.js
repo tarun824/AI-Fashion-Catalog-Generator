@@ -20,6 +20,7 @@ import integrationRoutes from "./integrationRoutes.js";
 import setupRoutes from "./setupRoutes.js";
 import aiRoutes from "./aiRoutes.js";
 import auditRoutes from "./auditRoutes.js";
+import stagingRoutes from "./stagingRoutes.js";
 import { logWebhook } from "../utils/auditLogger.js";
 import { isDevelopment } from "../utils/environment.js";
 import { flexibleAuthMiddleware } from "../middleware/auth.js";
@@ -423,6 +424,7 @@ router.use("/admin/shipping", apiLimiter, shippingRoutes);
 router.use("/admin/integrations", apiLimiter, integrationRoutes);
 router.use("/admin/setup", apiLimiter, setupRoutes);
 router.use("/admin/audits", apiLimiter, auditRoutes);
+router.use("/admin/staging", apiLimiter, stagingRoutes); // Smart Staging System
 router.use("/search", searchRoutes);
 router.use("/images", imageRoutes);
 router.use("/vendor/auth", vendorAuthRoutes);

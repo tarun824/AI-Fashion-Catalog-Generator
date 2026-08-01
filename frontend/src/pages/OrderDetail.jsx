@@ -171,7 +171,7 @@ export default function OrderDetail() {
           >
             ← Back to Orders
           </Link>
-          <h1 className="text-2xl font-bold text-gray-900">
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
             {order.orderNumber}
           </h1>
           <p className="mt-1 text-sm text-gray-500">
@@ -180,19 +180,30 @@ export default function OrderDetail() {
           </p>
         </div>
         <div className="flex gap-2">
-          <button
+          {/* TODO: */}
+          {/* <button
             onClick={handlePrintInvoice}
             className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition"
           >
             Print Invoice
-          </button>
+          </button> */}
           {order.status !== "cancelled" && order.status !== "delivered" && (
-            <button
-              onClick={handleCancelOrder}
-              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition"
-            >
-              Cancel Order
-            </button>
+            <>
+              <button
+                onClick={() => setShowShippingConfirm(true)}
+                disabled={order.status === "pending"}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Package className="w-4 h-4" />
+                Ship with Options
+              </button>
+              <button
+                onClick={handleCancelOrder}
+                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition"
+              >
+                Cancel Order
+              </button>
+            </>
           )}
         </div>
       </div>
@@ -234,179 +245,166 @@ export default function OrderDetail() {
         </div>
       )}
 
-      {/* Status and Payment Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="bg-white p-6 rounded-lg shadow border border-gray-200">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-gray-900">
-              Order Status
-            </h2>
-            <button
-              onClick={() => {
-                setNewStatus(order.status);
-                setShowStatusModal(true);
-              }}
-              className="text-sm text-blue-600 hover:text-blue-800"
-            >
-              Update
-            </button>
-          </div>
-          <div className="space-y-3">
-            <div>
-              <OrderStatusBadge status={order.status} type="order" />
-            </div>
-            <div className="text-sm">
-              <span className="text-gray-500">Source:</span>{" "}
-              <span className="font-medium capitalize">{order.source}</span>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white p-6 rounded-lg shadow border border-gray-200">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-gray-900">Payment</h2>
-            <button
-              onClick={() => {
-                setNewPaymentStatus(order.payment.status);
-                setShowPaymentModal(true);
-              }}
-              className="text-sm text-blue-600 hover:text-blue-800"
-            >
-              Update
-            </button>
-          </div>
-          <div className="space-y-3">
-            <div>
-              <OrderStatusBadge status={order.payment.status} type="payment" />
-            </div>
-            <div className="text-sm">
-              <span className="text-gray-500">Method:</span>{" "}
-              <span className="font-medium">{order.payment.method}</span>
-            </div>
-            {order.payment.transactionId && (
-              <div className="text-sm">
-                <span className="text-gray-500">Transaction ID:</span>{" "}
-                <span className="font-mono text-xs">
-                  {order.payment.transactionId}
-                </span>
-              </div>
-            )}
-            {order.payment.paidAmount > 0 && (
-              <div className="text-sm">
-                <span className="text-gray-500">Paid Amount:</span>{" "}
-                <span className="font-medium text-green-600">
-                  ₹{order.payment.paidAmount.toLocaleString()}
-                </span>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Shipping Section - Always visible for non-cancelled/non-delivered orders */}
+      {/* Shipping Progress - Shows shipping flow chart */}
       {order.status !== "cancelled" && order.status !== "delivered" && (
-        <div
-          id="shipping-section"
-          className="bg-gradient-to-br from-blue-50 to-purple-50 p-6 rounded-xl border border-blue-200"
-        >
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center gap-3">
-              <div className="p-3 bg-white rounded-lg shadow-sm">
-                <Truck className="w-6 h-6 text-blue-600" />
-              </div>
-              <div>
-                <h2 className="text-xl font-bold text-gray-900">Shipping</h2>
-                <p className="text-sm text-gray-600">
-                  {order.shipping?.awbCode
-                    ? "Track shipment or manage shipping"
-                    : "Create shipment to start delivery"}
-                </p>
-              </div>
+        <div className="bg-white rounded-lg p-6 shadow border border-gray-200">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">
+            Shipping Progress
+          </h3>
+          <div className="flex items-center justify-between relative">
+            {/* Progress Line */}
+            <div className="absolute top-5 left-0 right-0 h-0.5 bg-gray-200">
+              <div
+                className="h-full bg-blue-600 transition-all duration-500"
+                style={{
+                  width: `${
+                    order.shipping?.deliveredAt
+                      ? "100%"
+                      : order.shipping?.pickupScheduledAt
+                        ? "75%"
+                        : order.shipping?.awbCode
+                          ? "50%"
+                          : order.shipping?.shiprocketOrderId
+                            ? "25%"
+                            : order.status === "confirmed"
+                              ? "12.5%"
+                              : "0%"
+                  }`,
+                }}
+              ></div>
             </div>
 
-            {!order.shipping?.awbCode && (
-              <div className="flex gap-3">
-                {order.status === "pending" && (
-                  <div className="flex items-center gap-2 px-4 py-2 bg-yellow-50 border border-yellow-200 rounded-lg text-sm text-yellow-700">
-                    <AlertCircle className="w-4 h-4" />
-                    <span>Confirm order first to ship</span>
-                  </div>
-                )}
-                <OneClickShip
-                  order={order}
-                  onSuccess={() => {
-                    loadOrder();
-                    setTrackingRefresh((prev) => prev + 1);
-                  }}
-                  disabled={order.status === "pending"}
-                />
-                <button
-                  onClick={() => setShowShippingConfirm(true)}
-                  disabled={order.status === "pending"}
-                  className="px-6 py-3 bg-white border-2 border-blue-600 text-blue-600 rounded-lg font-semibold hover:bg-blue-50 transition flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            {/* Steps */}
+            {[
+              {
+                label: "Order Confirmed",
+                completed:
+                  order.status === "confirmed" ||
+                  order.status === "processing" ||
+                  order.status === "shipped" ||
+                  order.status === "delivered",
+                current:
+                  order.status === "confirmed" &&
+                  !order.shipping?.shiprocketOrderId,
+                icon: "✓",
+                proof:
+                  order.status !== "pending"
+                    ? `Order ${order.orderNumber}`
+                    : null,
+                errorStage: null,
+              },
+              {
+                label: "Shipment Created",
+                completed: order.shipping?.shiprocketOrderId,
+                current:
+                  !order.shipping?.awbCode && order.shipping?.shiprocketOrderId,
+                icon: "📦",
+                proof: order.shipping?.shiprocketOrderId
+                  ? `SR ID: ${order.shipping.shiprocketOrderId}`
+                  : null,
+                errorStage: "create_order",
+              },
+              {
+                label: "Courier Assigned",
+                completed: order.shipping?.awbCode,
+                current:
+                  order.shipping?.awbCode && !order.shipping?.pickupScheduledAt,
+                icon: "🚚",
+                proof: order.shipping?.awbCode
+                  ? `AWB: ${order.shipping.awbCode}`
+                  : null,
+                errorStage: "assign_courier",
+              },
+              {
+                label: "Pickup Scheduled",
+                completed: order.shipping?.pickupScheduledAt,
+                current:
+                  order.shipping?.pickupScheduledAt &&
+                  !order.shipping?.deliveredAt,
+                icon: "📅",
+                proof: order.shipping?.pickupScheduledAt
+                  ? `Pickup: ${new Date(order.shipping.pickupScheduledAt).toLocaleDateString()}`
+                  : null,
+                errorStage: "schedule_pickup",
+              },
+              {
+                label: "Delivered",
+                completed:
+                  order.shipping?.deliveredAt || order.status === "delivered",
+                current: false,
+                icon: "🎉",
+                proof: order.shipping?.deliveredAt
+                  ? `Delivered: ${new Date(order.shipping.deliveredAt).toLocaleDateString()}`
+                  : null,
+                errorStage: "tracking",
+              },
+            ].map((step, index) => {
+              const hasError =
+                order.shipping?.lastError?.stage === step.errorStage;
+              const isBlocked = hasError && !step.completed;
+
+              return (
+                <div
+                  key={index}
+                  className="flex flex-col items-center relative z-10"
+                  style={{ flex: 1 }}
                 >
-                  <Package className="w-5 h-5" />
-                  Ship with Options
-                </button>
-              </div>
-            )}
-          </div>
-
-          {order.shipping?.awbCode ? (
-            <ShippingTracking order={order} refreshTrigger={trackingRefresh} />
-          ) : (
-            <div className="bg-white rounded-lg p-6 text-center border border-gray-200">
-              <Package className="w-16 h-16 text-gray-300 mx-auto mb-3" />
-              {order.status === "pending" ? (
-                <>
-                  <p className="text-gray-900 font-semibold mb-2">
-                    Order needs to be confirmed before shipping
-                  </p>
-                  <p className="text-sm text-gray-500 mb-4">
-                    Update order status to "Confirmed" in the Order Status
-                    section above
-                  </p>
-                  <button
-                    onClick={async () => {
-                      if (confirm("Confirm this order now?")) {
-                        try {
-                          setUpdating(true);
-                          await api.patch(`/admin/orders/${id}/status`, {
-                            status: "confirmed",
-                            note: "Confirmed for shipping",
-                          });
-                          await loadOrder();
-                        } catch (err) {
-                          alert("Failed to confirm: " + err.message);
-                        } finally {
-                          setUpdating(false);
-                        }
-                      }
-                    }}
-                    disabled={updating}
-                    className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition disabled:opacity-50"
+                  <div
+                    className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold transition-all duration-300 mb-2 ${
+                      isBlocked
+                        ? "bg-red-600 text-white shadow-lg border-2 border-red-400"
+                        : step.completed
+                          ? "bg-blue-600 text-white shadow-lg"
+                          : step.current
+                            ? "bg-white border-4 border-blue-600 text-blue-600 shadow-lg animate-pulse"
+                            : "bg-gray-200 text-gray-400"
+                    }`}
                   >
-                    {updating ? "Confirming..." : "✓ Confirm Order Now"}
-                  </button>
-                </>
-              ) : (
-                <>
-                  <p className="text-gray-600 mb-4">
-                    Order confirmed and ready to ship
-                  </p>
-                  <p className="text-sm text-gray-500">
-                    Use "One-Click Ship" for automatic courier selection or
-                    <br />
-                    "Ship with Options" to manually choose courier and customize
-                  </p>
-                </>
-              )}
-            </div>
-          )}
+                    {isBlocked ? "✕" : step.completed ? "✓" : step.icon}
+                  </div>
+                  <span
+                    className={`text-xs text-center font-medium ${
+                      isBlocked
+                        ? "text-red-600"
+                        : step.completed || step.current
+                          ? "text-gray-900 dark:text-white"
+                          : "text-gray-400"
+                    }`}
+                  >
+                    {step.label}
+                  </span>
+                  {/* Show proof/ID below completed steps */}
+                  {step.completed && step.proof && !isBlocked && (
+                    <span className="text-[10px] text-center text-gray-500 mt-1 font-mono bg-gray-100 px-2 py-0.5 rounded">
+                      {step.proof}
+                    </span>
+                  )}
+                  {/* Show error message for blocked steps */}
+                  {isBlocked && order.shipping?.lastError && (
+                    <div className="text-[10px] text-center mt-1 max-w-[120px]">
+                      <div className="bg-red-100 text-red-800 px-2 py-1 rounded font-medium mb-1">
+                        ⚠️ Error
+                      </div>
+                      <div className="text-red-600 leading-tight">
+                        {order.shipping.lastError.message}
+                      </div>
+                      {order.shipping.lastError.timestamp && (
+                        <div className="text-gray-400 mt-1">
+                          {new Date(
+                            order.shipping.lastError.timestamp,
+                          ).toLocaleString()}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
 
-      {/* Customer Information */}
+      {/* Customer Information - FIRST for business users */}
       <div className="bg-white p-6 rounded-lg shadow border border-gray-200">
         <h2 className="text-lg font-semibold text-gray-900 mb-4">
           Customer Information
@@ -445,96 +443,208 @@ export default function OrderDetail() {
         </div>
       </div>
 
-      {/* Order Items */}
+      {/* Order Details Table - SECOND for complete overview */}
+      <div className="bg-white p-6 rounded-lg shadow border border-gray-200">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold text-gray-900">Order Details</h2>
+          <div className="flex gap-2">
+            <button
+              onClick={() => {
+                setNewStatus(order.status);
+                setShowStatusModal(true);
+              }}
+              className="text-xs text-blue-600 hover:text-blue-800 px-2 py-1 border border-blue-200 rounded"
+            >
+              Update Status
+            </button>
+            <button
+              onClick={() => {
+                setNewPaymentStatus(order.payment.status);
+                setShowPaymentModal(true);
+              }}
+              className="text-xs text-blue-600 hover:text-blue-800 px-2 py-1 border border-blue-200 rounded"
+            >
+              Update Payment
+            </button>
+          </div>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <tbody className="bg-white divide-y divide-gray-200">
+              <tr>
+                <td className="px-4 py-3 text-xs font-medium text-gray-500 uppercase w-1/4">
+                  Order #
+                </td>
+                <td className="px-4 py-3 text-sm font-semibold text-gray-900">
+                  {order.orderNumber}
+                </td>
+                <td className="px-4 py-3 text-xs font-medium text-gray-500 uppercase w-1/4">
+                  Status
+                </td>
+                <td className="px-4 py-3">
+                  <OrderStatusBadge status={order.status} type="order" />
+                </td>
+              </tr>
+              <tr>
+                <td className="px-4 py-3 text-xs font-medium text-gray-500 uppercase">
+                  Source
+                </td>
+                <td className="px-4 py-3 text-sm font-semibold text-gray-900 capitalize">
+                  {order.source}
+                </td>
+                <td className="px-4 py-3 text-xs font-medium text-gray-500 uppercase">
+                  Payment Status
+                </td>
+                <td className="px-4 py-3">
+                  <OrderStatusBadge
+                    status={order.payment.status}
+                    type="payment"
+                  />
+                </td>
+              </tr>
+              <tr>
+                <td className="px-4 py-3 text-xs font-medium text-gray-500 uppercase">
+                  Payment Method
+                </td>
+                <td className="px-4 py-3 text-sm font-semibold text-gray-900">
+                  {order.payment.method}
+                </td>
+                <td className="px-4 py-3 text-xs font-medium text-gray-500 uppercase">
+                  Items
+                </td>
+                <td className="px-4 py-3 text-sm font-semibold text-gray-900">
+                  {order.items.length} item(s)
+                </td>
+              </tr>
+              <tr>
+                <td className="px-4 py-3 text-xs font-medium text-gray-500 uppercase">
+                  Subtotal
+                </td>
+                <td className="px-4 py-3 text-sm font-semibold text-gray-900">
+                  ₹{order.pricing.subtotal.toLocaleString()}
+                </td>
+                <td className="px-4 py-3 text-xs font-medium text-gray-500 uppercase">
+                  Discount
+                </td>
+                <td className="px-4 py-3 text-sm font-semibold text-green-600">
+                  {order.pricing.discount > 0
+                    ? `-₹${order.pricing.discount.toLocaleString()}`
+                    : "₹0"}
+                </td>
+              </tr>
+              <tr>
+                <td className="px-4 py-3 text-xs font-medium text-gray-500 uppercase">
+                  Shipping Charge
+                </td>
+                <td className="px-4 py-3 text-sm font-semibold text-gray-900">
+                  ₹{order.pricing.shippingCharge.toLocaleString()}
+                </td>
+                <td className="px-4 py-3 text-xs font-medium text-gray-500 uppercase">
+                  Tax
+                </td>
+                <td className="px-4 py-3 text-sm font-semibold text-gray-900">
+                  ₹{order.pricing.tax.toLocaleString()}
+                </td>
+              </tr>
+              <tr className="bg-blue-50">
+                <td className="px-4 py-3 text-xs font-bold text-gray-700 uppercase">
+                  Total Amount
+                </td>
+                <td className="px-4 py-3 text-lg font-bold text-blue-600">
+                  ₹{order.pricing.total.toLocaleString()}
+                </td>
+                <td className="px-4 py-3 text-xs font-medium text-gray-500 uppercase">
+                  Paid Amount
+                </td>
+                <td className="px-4 py-3 text-sm font-semibold text-green-600">
+                  {order.payment.paidAmount > 0
+                    ? `₹${order.payment.paidAmount.toLocaleString()}`
+                    : "₹0"}
+                </td>
+              </tr>
+              <tr>
+                <td className="px-4 py-3 text-xs font-medium text-gray-500 uppercase">
+                  Created At
+                </td>
+                <td className="px-4 py-3 text-sm font-semibold text-gray-900">
+                  {format(new Date(order.createdAt), "MMM d, yyyy h:mm a")}
+                </td>
+                <td className="px-4 py-3 text-xs font-medium text-gray-500 uppercase">
+                  Paid At
+                </td>
+                <td className="px-4 py-3 text-sm font-semibold text-green-600">
+                  {order.payment.paidAt
+                    ? format(
+                        new Date(order.payment.paidAt),
+                        "MMM d, yyyy h:mm a",
+                      )
+                    : "-"}
+                </td>
+              </tr>
+              {order.payment.transactionId && (
+                <tr>
+                  <td className="px-4 py-3 text-xs font-medium text-gray-500 uppercase">
+                    Transaction ID
+                  </td>
+                  <td
+                    className="px-4 py-3 text-sm font-mono text-gray-900"
+                    colSpan={3}
+                  >
+                    {order.payment.transactionId}
+                  </td>
+                </tr>
+              )}
+              {order.notes && (
+                <tr>
+                  <td className="px-4 py-3 text-xs font-medium text-gray-500 uppercase">
+                    Order Notes
+                  </td>
+                  <td className="px-4 py-3 text-sm text-gray-900" colSpan={3}>
+                    {order.notes}
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Order Items - THIRD */}
       <div className="bg-white p-6 rounded-lg shadow border border-gray-200">
         <h2 className="text-lg font-semibold text-gray-900 mb-4">
           Order Items
         </h2>
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                  SKU
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                  Product
-                </th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">
-                  Quantity
-                </th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">
-                  Price
-                </th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">
-                  Subtotal
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {order.items.map((item, index) => (
-                <tr key={index}>
-                  <td className="px-4 py-4 text-sm text-gray-900">
-                    {item.sku}
-                  </td>
-                  <td className="px-4 py-4 text-sm text-gray-900">
-                    {item.name}
-                  </td>
-                  <td className="px-4 py-4 text-sm text-gray-900 text-right">
-                    {item.quantity}
-                  </td>
-                  <td className="px-4 py-4 text-sm text-gray-900 text-right">
-                    ₹{item.price.toLocaleString()}
-                  </td>
-                  <td className="px-4 py-4 text-sm font-medium text-gray-900 text-right">
+        <div className="space-y-3">
+          {order.items.map((item, index) => (
+            <div
+              key={index}
+              className="bg-gray-50 p-4 rounded-lg border border-gray-200"
+            >
+              <div className="flex items-start justify-between">
+                <div className="flex-1">
+                  <p className="font-semibold text-gray-900">{item.name}</p>
+                  <p className="text-xs text-gray-500 mt-1">SKU: {item.sku}</p>
+                </div>
+                <div className="text-right ml-4">
+                  <p className="font-semibold text-gray-900">
                     ₹{item.subtotal.toLocaleString()}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Order Totals */}
-        <div className="mt-6 flex justify-end">
-          <div className="w-80 space-y-2">
-            <div className="flex justify-between text-sm">
-              <span className="text-gray-500">Subtotal:</span>
-              <span className="font-medium">
-                ₹{order.pricing.subtotal.toLocaleString()}
-              </span>
+                  </p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    {item.quantity} × ₹{item.price.toLocaleString()}
+                  </p>
+                </div>
+              </div>
             </div>
-            {order.pricing.discount > 0 && (
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-500">Discount:</span>
-                <span className="font-medium text-red-600">
-                  -₹{order.pricing.discount.toLocaleString()}
-                </span>
-              </div>
-            )}
-            {order.pricing.tax > 0 && (
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-500">Tax:</span>
-                <span className="font-medium">
-                  ₹{order.pricing.tax.toLocaleString()}
-                </span>
-              </div>
-            )}
-            {order.pricing.shippingCharge > 0 && (
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-500">Shipping:</span>
-                <span className="font-medium">
-                  ₹{order.pricing.shippingCharge.toLocaleString()}
-                </span>
-              </div>
-            )}
-            <div className="flex justify-between text-lg font-bold border-t pt-2">
-              <span>Total:</span>
-              <span>₹{order.pricing.total.toLocaleString()}</span>
-            </div>
-          </div>
+          ))}
         </div>
       </div>
+
+      {/* Shipping Tracking - Show tracking details if order is shipped */}
+      {order.shipping?.awbCode && (
+        <div id="shipping-section">
+          <ShippingTracking order={order} refreshTrigger={trackingRefresh} />
+        </div>
+      )}
 
       {/* Shipping Information */}
       {(order.shipping.courier ||
@@ -582,40 +692,6 @@ export default function OrderDetail() {
                 </p>
               </div>
             )}
-          </div>
-        </div>
-      )}
-
-      {/* Status History Timeline */}
-      {order.statusHistory && order.statusHistory.length > 0 && (
-        <div className="bg-white p-6 rounded-lg shadow border border-gray-200">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">
-            Order Timeline
-          </h2>
-          <div className="space-y-4">
-            {order.statusHistory
-              .slice()
-              .reverse()
-              .map((entry, index) => (
-                <div key={index} className="flex gap-4">
-                  <div className="flex-shrink-0 w-2 h-2 mt-2 rounded-full bg-blue-500"></div>
-                  <div className="flex-1">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <OrderStatusBadge status={entry.status} type="order" />
-                        {entry.note && (
-                          <p className="text-sm text-gray-600 mt-1">
-                            {entry.note}
-                          </p>
-                        )}
-                      </div>
-                      <span className="text-xs text-gray-500">
-                        {format(new Date(entry.timestamp), "MMM d, h:mm a")}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              ))}
           </div>
         </div>
       )}

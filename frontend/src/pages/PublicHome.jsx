@@ -1,5 +1,6 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
+import { api, API_BASE_URL } from "../utils/api";
 import "../styles/PublicHome.css";
 
 /**
@@ -7,6 +8,32 @@ import "../styles/PublicHome.css";
  * Main landing page for saree storefront
  */
 const PublicHome = () => {
+  const [newArrivals, setNewArrivals] = useState([]);
+  const [featuredProducts, setFeaturedProducts] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    loadProducts();
+  }, []);
+
+  const loadProducts = async () => {
+    setLoading(true);
+    try {
+      // Fetch new arrivals (newest first)
+      const [newResponse, featuredResponse] = await Promise.all([
+        api.get("/public/products", { params: { limit: 8, sort: "newest" } }),
+        api.get("/public/products", { params: { limit: 8, sort: "popular" } }),
+      ]);
+
+      setNewArrivals(newResponse.products || []);
+      setFeaturedProducts(featuredResponse.products || []);
+    } catch (error) {
+      console.error("Error loading products:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="public-home">
       {/* Hero Section */}
@@ -24,6 +51,61 @@ const PublicHome = () => {
           </Link>
         </div>
       </section>
+
+      {/* New Arrivals Section */}
+      <section className="products-section">
+        <div className="section-header">
+          <h2>New Arrivals</h2>
+          <p className="subtitle">Fresh Additions to Our Collection</p>
+        </div>
+
+        {loading ? (
+          <div className="loading-products">
+            <div className="loading-spinner"></div>
+            <p>Loading products...</p>
+          </div>
+        ) : newArrivals.length === 0 ? (
+          <div className="no-products-message">
+            <p>No products available yet. Check back soon!</p>
+          </div>
+        ) : (
+          <div className="home-product-grid">
+            {newArrivals.map((product) => (
+              <ProductCard key={product.id} product={product} />
+            ))}
+          </div>
+        )}
+
+        {newArrivals.length > 0 && (
+          <div className="view-all-container">
+            <Link to="/browse?sort=newest" className="btn-secondary">
+              View All New Arrivals
+            </Link>
+          </div>
+        )}
+      </section>
+
+      {/* Featured Products Section */}
+      {featuredProducts.length > 0 && (
+        <section className="products-section featured-bg">
+          <div className="section-header">
+            <h2>Popular Picks</h2>
+            <p className="subtitle">Most Loved by Our Customers</p>
+          </div>
+
+          <div className="home-product-grid">
+            {featuredProducts.map((product) => (
+              <ProductCard key={product.id} product={product} />
+            ))}
+          </div>
+
+          <div className="view-all-container">
+            <Link to="/browse?sort=popular" className="btn-secondary">
+              View All Popular
+            </Link>
+          </div>
+        </section>
+      )}
 
       {/* Shop by Occasion */}
       <section className="occasion-section">
@@ -181,6 +263,57 @@ const FeatureCard = ({ icon, title, description }) => {
       <h3>{title}</h3>
       <p>{description}</p>
     </div>
+  );
+};
+
+// Product Card Component for Home Page
+const ProductCard = ({ product }) => {
+  const imageUrl = product.thumbnail
+    ? `${API_BASE_URL}/images/${product.thumbnail}`
+    : "/placeholder-saree.jpg";
+
+  return (
+    <Link to={`/products/${product.slug}`} className="home-product-card">
+      <div className="product-image-wrapper">
+        <img src={imageUrl} alt={product.name} loading="lazy" />
+        {!product.inStock && (
+          <span className="out-of-stock-badge">Out of Stock</span>
+        )}
+      </div>
+      <div className="product-details">
+        <h3 className="product-name">{product.name}</h3>
+        <p className="product-meta">
+          {[product.fabric, product.occasion].filter(Boolean).join(" • ")}
+        </p>
+        {product.colors?.length > 0 && (
+          <div className="product-colors">
+            {product.colors.slice(0, 4).map((color, idx) => (
+              <span
+                key={idx}
+                className="color-dot"
+                title={color}
+                style={{ backgroundColor: color.toLowerCase() }}
+              />
+            ))}
+            {product.colors.length > 4 && (
+              <span className="more-colors">+{product.colors.length - 4}</span>
+            )}
+          </div>
+        )}
+        <div className="product-price">
+          ₹{product.price?.toLocaleString("en-IN")}
+        </div>
+        {product.rating > 0 && (
+          <div className="product-rating">
+            <span className="star">★</span>
+            <span>{product.rating.toFixed(1)}</span>
+            {product.ratingCount > 0 && (
+              <span className="rating-count">({product.ratingCount})</span>
+            )}
+          </div>
+        )}
+      </div>
+    </Link>
   );
 };
 

@@ -6,6 +6,15 @@ export default function QuickActionsPanel() {
 
   const actions = [
     {
+      title: "Smart Staging",
+      description: "Auto-group & process multiple images",
+      icon: "🎯",
+      link: "/admin/smart-staging",
+      color: "from-purple-500 to-pink-600",
+      hoverColor: "hover:from-purple-600 hover:to-pink-700",
+      badge: "NEW",
+    },
+    {
       title: "Upload Batch",
       description: "Process multiple images with AI",
       icon: "📤",
@@ -28,14 +37,6 @@ export default function QuickActionsPanel() {
       link: "/admin/search",
       color: "from-pink-500 to-rose-600",
       hoverColor: "hover:from-pink-600 hover:to-rose-700",
-    },
-    {
-      title: "Manage Categories",
-      description: "Organize product categories",
-      icon: "📂",
-      link: "/admin/categories",
-      color: "from-blue-500 to-cyan-600",
-      hoverColor: "hover:from-blue-600 hover:to-cyan-700",
     },
   ];
 
@@ -80,6 +81,13 @@ export default function QuickActionsPanel() {
             to={action.link}
             className={`relative group overflow-hidden rounded-xl p-6 bg-gradient-to-br ${action.color} ${action.hoverColor} transition-all duration-300 transform hover:scale-105 hover:shadow-lg`}
           >
+            {action.badge && (
+              <div className="absolute top-3 right-3 z-20">
+                <span className="px-2.5 py-1 text-xs font-bold bg-white text-purple-600 rounded-full shadow-lg animate-pulse">
+                  {action.badge}
+                </span>
+              </div>
+            )}
             <div className="relative z-10">
               <div className="text-4xl mb-3">{action.icon}</div>
               <h4 className="text-lg font-bold text-white mb-1">

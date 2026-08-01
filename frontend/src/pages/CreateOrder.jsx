@@ -6,9 +6,9 @@ import CustomerSelector from "../components/CustomerSelector";
 export default function CreateOrder() {
   const navigate = useNavigate();
   const [submitting, setSubmitting] = useState(false);
-  const [products, setProducts] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [searchResults, setSearchResults] = useState([]);
+  const [searching, setSearching] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState(null);
 
   // Form State
@@ -38,7 +38,7 @@ export default function CreateOrder() {
     status: "pending",
   });
 
-  const [shipping, setShipping] = useState({
+  const [shipping] = useState({
     courier: "",
     trackingNumber: "",
   });
@@ -84,22 +84,35 @@ export default function CreateOrder() {
     }
   };
 
-  // Search products
+  // Search products - Uses dedicated endpoint with SKU + title search
   const searchProducts = async (query) => {
-    if (!query.trim()) {
-      setSearchResults([]);
-      return;
-    }
+    console.log("🔍 Searching for:", query || "(all products)");
+    setSearching(true);
 
     try {
+      // Use /search-for-order endpoint: minimal data, SKU + title search
       const response = await api.get(
-        `/admin/products?search=${encodeURIComponent(query)}&limit=10`,
+        `/admin/products/search-for-order?search=${encodeURIComponent(query || "")}&limit=10`,
       );
-      setSearchResults(response.data || []);
+      console.log("✅ Search response:", response);
+
+      // Backend returns: { success: true, data: [...products] }
+      const products = response.data?.data || response.data || [];
+      console.log("📦 Products found:", products.length, products);
+
+      setSearchResults(products);
     } catch (err) {
-      console.error("Search failed:", err);
+      console.error("❌ Search failed:", err);
+      setSearchResults([]);
+    } finally {
+      setSearching(false);
     }
   };
+
+  // Load products on page load
+  useEffect(() => {
+    searchProducts("");
+  }, []);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -231,12 +244,14 @@ export default function CreateOrder() {
       <div>
         <Link
           to="/admin/orders"
-          className="text-sm text-blue-600 hover:text-blue-800 mb-2 inline-block"
+          className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 mb-2 inline-block"
         >
           ← Back to Orders
         </Link>
-        <h1 className="text-2xl font-bold text-gray-900">Create New Order</h1>
-        <p className="mt-1 text-sm text-gray-500">
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+          Create New Order
+        </h1>
+        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
           Manually create an order for phone/WhatsApp enquiries
         </p>
       </div>
@@ -429,37 +444,68 @@ export default function CreateOrder() {
         </div>
 
         {/* Order Items */}
-        <div className="bg-white p-6 rounded-lg shadow border border-gray-200">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">
+        <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow border border-gray-200 dark:border-gray-700">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
             Order Items
           </h2>
 
           {/* Product Search */}
           <div className="mb-4 relative">
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Search Products
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Search Products{" "}
+              {searching && (
+                <span className="text-blue-500 text-xs">(Loading...)</span>
+              )}
+              {!searching && searchResults.length > 0 && (
+                <span className="text-green-600 dark:text-green-400 text-xs">
+                  ({searchResults.length} found)
+                </span>
+              )}
             </label>
             <input
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Search by SKU or product name..."
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+              placeholder="Start typing to filter products... (or click dropdown)"
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
+              onFocus={() =>
+                searchTerm === "" &&
+                searchResults.length === 0 &&
+                searchProducts("")
+              }
             />
+            {searching && (
+              <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg p-4">
+                <p className="text-sm text-gray-500 dark:text-gray-400 text-center">
+                  🔍 Loading products...
+                </p>
+              </div>
+            )}
+            {!searching && searchTerm && searchResults.length === 0 && (
+              <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg p-4">
+                <p className="text-sm text-gray-500 dark:text-gray-400 text-center">
+                  No products found for "{searchTerm}". Try different keywords.
+                </p>
+              </div>
+            )}
             {searchResults.length > 0 && (
-              <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+              <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg max-h-60 overflow-y-auto">
                 {searchResults.map((product) => (
                   <button
                     key={product._id}
                     type="button"
                     onClick={() => addItem(product)}
-                    className="w-full px-4 py-2 text-left hover:bg-gray-100 flex justify-between items-center"
+                    className="w-full px-4 py-2 text-left hover:bg-gray-100 dark:hover:bg-gray-700 flex justify-between items-center border-b border-gray-100 dark:border-gray-700 last:border-b-0"
                   >
                     <div>
-                      <div className="font-medium text-sm">{product.name}</div>
-                      <div className="text-xs text-gray-500">{product.sku}</div>
+                      <div className="font-medium text-sm text-gray-900 dark:text-white">
+                        {product.name}
+                      </div>
+                      <div className="text-xs text-gray-500 dark:text-gray-400">
+                        {product.sku}
+                      </div>
                     </div>
-                    <div className="text-sm font-medium">
+                    <div className="text-sm font-medium text-gray-900 dark:text-white">
                       ₹{product.pricing?.mrp || product.pricing?.salePrice || 0}
                     </div>
                   </button>
@@ -470,7 +516,7 @@ export default function CreateOrder() {
 
           {/* Items List */}
           {items.length === 0 ? (
-            <div className="text-center py-8 text-gray-500">
+            <div className="text-center py-8 text-gray-500 dark:text-gray-400">
               <p>No items added yet</p>
             </div>
           ) : (
@@ -478,20 +524,22 @@ export default function CreateOrder() {
               {items.map((item, index) => (
                 <div
                   key={index}
-                  className="grid grid-cols-12 gap-2 items-start p-3 bg-gray-50 rounded"
+                  className="grid grid-cols-12 gap-2 items-start p-3 bg-gray-50 dark:bg-gray-700 rounded"
                 >
                   <div className="col-span-3">
-                    <label className="text-xs text-gray-500">SKU</label>
+                    <label className="text-xs text-gray-500 dark:text-gray-400">
+                      SKU
+                    </label>
                     <input
                       type="text"
                       value={item.sku}
                       onChange={(e) => updateItem(index, "sku", e.target.value)}
                       required
-                      className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
+                      className="w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
                     />
                   </div>
                   <div className="col-span-4">
-                    <label className="text-xs text-gray-500">
+                    <label className="text-xs text-gray-500 dark:text-gray-400">
                       Product Name
                     </label>
                     <input
@@ -501,11 +549,13 @@ export default function CreateOrder() {
                         updateItem(index, "name", e.target.value)
                       }
                       required
-                      className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
+                      className="w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
                     />
                   </div>
                   <div className="col-span-2">
-                    <label className="text-xs text-gray-500">Qty</label>
+                    <label className="text-xs text-gray-500 dark:text-gray-400">
+                      Qty
+                    </label>
                     <input
                       type="number"
                       value={item.quantity}
@@ -518,11 +568,13 @@ export default function CreateOrder() {
                       }
                       min="1"
                       required
-                      className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
+                      className="w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
                     />
                   </div>
                   <div className="col-span-2">
-                    <label className="text-xs text-gray-500">Price</label>
+                    <label className="text-xs text-gray-500 dark:text-gray-400">
+                      Price
+                    </label>
                     <input
                       type="number"
                       value={item.price}
@@ -536,14 +588,14 @@ export default function CreateOrder() {
                       step="0.01"
                       min="0"
                       required
-                      className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
+                      className="w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
                     />
                   </div>
                   <div className="col-span-1 flex items-end">
                     <button
                       type="button"
                       onClick={() => removeItem(index)}
-                      className="p-1 text-red-600 hover:text-red-800"
+                      className="p-1 text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300"
                     >
                       ✕
                     </button>
@@ -556,21 +608,27 @@ export default function CreateOrder() {
           <button
             type="button"
             onClick={addManualItem}
-            className="text-sm text-blue-600 hover:text-blue-800"
+            className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300"
           >
             + Add Manual Item
           </button>
 
           {/* Pricing */}
-          <div className="mt-6 border-t pt-4">
+          <div className="mt-6 border-t border-gray-200 dark:border-gray-700 pt-4">
             <div className="flex justify-end">
               <div className="w-80 space-y-3">
                 <div className="flex justify-between text-sm">
-                  <span className="text-gray-500">Subtotal:</span>
-                  <span className="font-medium">₹{subtotal.toFixed(2)}</span>
+                  <span className="text-gray-500 dark:text-gray-400">
+                    Subtotal:
+                  </span>
+                  <span className="font-medium text-gray-900 dark:text-white">
+                    ₹{subtotal.toFixed(2)}
+                  </span>
                 </div>
                 <div className="flex justify-between items-center text-sm">
-                  <span className="text-gray-500">Discount:</span>
+                  <span className="text-gray-500 dark:text-gray-400">
+                    Discount:
+                  </span>
                   <input
                     type="number"
                     value={pricing.discount}
@@ -579,11 +637,11 @@ export default function CreateOrder() {
                     }
                     step="0.01"
                     min="0"
-                    className="w-24 px-2 py-1 text-sm border border-gray-300 rounded text-right"
+                    className="w-24 px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded text-right bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                   />
                 </div>
                 <div className="flex justify-between items-center text-sm">
-                  <span className="text-gray-500">Tax:</span>
+                  <span className="text-gray-500 dark:text-gray-400">Tax:</span>
                   <input
                     type="number"
                     value={pricing.tax}
@@ -592,11 +650,13 @@ export default function CreateOrder() {
                     }
                     step="0.01"
                     min="0"
-                    className="w-24 px-2 py-1 text-sm border border-gray-300 rounded text-right"
+                    className="w-24 px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded text-right bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                   />
                 </div>
                 <div className="flex justify-between items-center text-sm">
-                  <span className="text-gray-500">Shipping:</span>
+                  <span className="text-gray-500 dark:text-gray-400">
+                    Shipping:
+                  </span>
                   <input
                     type="number"
                     value={pricing.shippingCharge}
@@ -605,12 +665,14 @@ export default function CreateOrder() {
                     }
                     step="0.01"
                     min="0"
-                    className="w-24 px-2 py-1 text-sm border border-gray-300 rounded text-right"
+                    className="w-24 px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded text-right bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                   />
                 </div>
-                <div className="flex justify-between text-lg font-bold border-t pt-2">
-                  <span>Total:</span>
-                  <span>₹{total.toFixed(2)}</span>
+                <div className="flex justify-between text-lg font-bold border-t border-gray-200 dark:border-gray-700 pt-2">
+                  <span className="text-gray-900 dark:text-white">Total:</span>
+                  <span className="text-gray-900 dark:text-white">
+                    ₹{total.toFixed(2)}
+                  </span>
                 </div>
               </div>
             </div>
@@ -619,13 +681,13 @@ export default function CreateOrder() {
 
         {/* Payment & Order Details */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="bg-white p-6 rounded-lg shadow border border-gray-200">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">
+          <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow border border-gray-200 dark:border-gray-700">
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
               Payment
             </h2>
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   Payment Method
                 </label>
                 <select
@@ -633,7 +695,7 @@ export default function CreateOrder() {
                   onChange={(e) =>
                     setPayment({ ...payment, method: e.target.value })
                   }
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
                 >
                   <option value="COD">Cash on Delivery</option>
                   <option value="UPI">UPI</option>
@@ -644,7 +706,7 @@ export default function CreateOrder() {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   Payment Status
                 </label>
                 <select
@@ -652,7 +714,7 @@ export default function CreateOrder() {
                   onChange={(e) =>
                     setPayment({ ...payment, status: e.target.value })
                   }
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
                 >
                   <option value="pending">Pending</option>
                   <option value="paid">Paid</option>
@@ -662,19 +724,19 @@ export default function CreateOrder() {
             </div>
           </div>
 
-          <div className="bg-white p-6 rounded-lg shadow border border-gray-200">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">
+          <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow border border-gray-200 dark:border-gray-700">
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
               Order Details
             </h2>
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   Source
                 </label>
                 <select
                   value={source}
                   onChange={(e) => setSource(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
                 >
                   <option value="manual">Manual Entry</option>
                   <option value="whatsapp">WhatsApp</option>
@@ -687,29 +749,31 @@ export default function CreateOrder() {
         </div>
 
         {/* Notes */}
-        <div className="bg-white p-6 rounded-lg shadow border border-gray-200">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Notes</h2>
+        <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow border border-gray-200 dark:border-gray-700">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+            Notes
+          </h2>
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Customer Notes
               </label>
               <textarea
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 rows={3}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Internal Notes
               </label>
               <textarea
                 value={internalNotes}
                 onChange={(e) => setInternalNotes(e.target.value)}
                 rows={3}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
               />
             </div>
           </div>
@@ -719,7 +783,7 @@ export default function CreateOrder() {
         <div className="flex justify-end gap-3">
           <Link
             to="/admin/orders"
-            className="px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition"
+            className="px-6 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition"
           >
             Cancel
           </Link>

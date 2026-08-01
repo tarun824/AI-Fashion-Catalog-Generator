@@ -1,9 +1,16 @@
-import OpenAI from 'openai';
-import embeddingService from './embeddingService.js';
+import OpenAI from "openai";
+import embeddingService from "./embeddingService.js";
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+// Lazy-loaded OpenAI client (initialized on first use, after dotenv loads)
+let openai = null;
+const getOpenAI = () => {
+  if (!openai) {
+    openai = new OpenAI({
+      apiKey: process.env.OPENAI_API_KEY,
+    });
+  }
+  return openai;
+};
 
 /**
  * Virtual Try-On Service
@@ -13,7 +20,7 @@ class VirtualTryOnService {
   /**
    * Generate try-on image using AI
    * Currently uses DALL-E for image generation
-   * 
+   *
    * For production, consider:
    * - Fal.ai (better quality, cheaper)
    * - Replicate (Stable Diffusion)
@@ -22,23 +29,33 @@ class VirtualTryOnService {
   async generateTryOn(personImageBuffer, productImageBuffer, productDetails) {
     try {
       // Prepare images
-      const personImage = await embeddingService.prepareImageForAnalysis(personImageBuffer, 512);
-      const productImage = await embeddingService.prepareImageForAnalysis(productImageBuffer, 512);
+      const personImage = await embeddingService.prepareImageForAnalysis(
+        personImageBuffer,
+        512,
+      );
+      const productImage = await embeddingService.prepareImageForAnalysis(
+        productImageBuffer,
+        512,
+      );
 
       // Analyze both images first
       const personAnalysis = await this.analyzePersonImage(personImage);
       const productAnalysis = await this.analyzeProductImage(productImage);
 
       // Generate descriptive prompt for try-on
-      const prompt = this.buildTryOnPrompt(personAnalysis, productAnalysis, productDetails);
+      const prompt = this.buildTryOnPrompt(
+        personAnalysis,
+        productAnalysis,
+        productDetails,
+      );
 
       // Use DALL-E to generate the try-on image
-      const response = await openai.images.generate({
-        model: 'dall-e-3',
+      const response = await getOpenAI().images.generate({
+        model: "dall-e-3",
         prompt: prompt,
         n: 1,
-        size: '1024x1024',
-        quality: 'standard',
+        size: "1024x1024",
+        quality: "standard",
       });
 
       return {
@@ -48,8 +65,8 @@ class VirtualTryOnService {
         productAnalysis,
       };
     } catch (error) {
-      console.error('Virtual try-on generation failed:', error.message);
-      throw new Error('Failed to generate try-on image');
+      console.error("Virtual try-on generation failed:", error.message);
+      throw new Error("Failed to generate try-on image");
     }
   }
 
@@ -57,18 +74,18 @@ class VirtualTryOnService {
    * Analyze person image to extract key features
    */
   async analyzePersonImage(base64Image) {
-    const response = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
+    const response = await getOpenAI().chat.completions.create({
+      model: "gpt-4o-mini",
       messages: [
         {
-          role: 'user',
+          role: "user",
           content: [
             {
-              type: 'text',
-              text: 'Describe this person briefly: skin tone, hair color, face shape, approximate age. Be concise (max 50 words).',
+              type: "text",
+              text: "Describe this person briefly: skin tone, hair color, face shape, approximate age. Be concise (max 50 words).",
             },
             {
-              type: 'image_url',
+              type: "image_url",
               image_url: { url: base64Image },
             },
           ],
@@ -84,18 +101,18 @@ class VirtualTryOnService {
    * Analyze product image
    */
   async analyzeProductImage(base64Image) {
-    const response = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
+    const response = await getOpenAI().chat.completions.create({
+      model: "gpt-4o-mini",
       messages: [
         {
-          role: 'user',
+          role: "user",
           content: [
             {
-              type: 'text',
-              text: 'Describe this saree: colors, patterns, borders, pallu design, fabric texture. Be specific (max 50 words).',
+              type: "text",
+              text: "Describe this saree: colors, patterns, borders, pallu design, fabric texture. Be specific (max 50 words).",
             },
             {
-              type: 'image_url',
+              type: "image_url",
               image_url: { url: base64Image },
             },
           ],
@@ -121,7 +138,7 @@ class VirtualTryOnService {
   async simpleComposite(personImageBuffer, productImageBuffer) {
     // This would require additional image processing libraries
     // For MVP, we rely on AI generation
-    throw new Error('Simple composite not implemented - use AI generation');
+    throw new Error("Simple composite not implemented - use AI generation");
   }
 }
 

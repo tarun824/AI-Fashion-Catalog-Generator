@@ -387,6 +387,201 @@ try {
 
 ---
 
+## Standardized API Error Handling
+
+### Axios-Like Error Structure (Frontend)
+
+**Problem**: Using `fetch` API but need consistent error handling across the app.
+
+**Solution**: Our `api.js` wraps fetch errors in an axios-like structure:
+
+```javascript
+// frontend/src/utils/api.js
+if (!response.ok) {
+  const errorData = await response.json();
+
+  const error = new Error(errorData.error);
+  error.response = {
+    status: response.status,
+    statusText: response.statusText,
+    data: errorData, // Contains: error, errorType, actionRequired, details
+  };
+
+  throw error;
+}
+```
+
+**Why**: Consistent with axios pattern, makes error handling predictable.
+
+### Backend Error Response Structure
+
+Always return structured errors from backend:
+
+```javascript
+// ✅ GOOD - Backend error response
+res.status(400).json({
+  error: "KYC verification is mandated...",     // Human-readable message
+  errorType: "KYC_REQUIRED",                    // Machine-readable type
+  actionRequired: "Complete KYC verification in Shiprocket dashboard",
+  details: { ... },                             // Additional context (optional)
+});
+```
+
+**Common Error Types**:
+
+- `KYC_REQUIRED` - User needs to complete verification
+- `INSUFFICIENT_BALANCE` - Account needs funds
+- `INVALID_INPUT` - User provided bad data
+- `NOT_FOUND` - Resource doesn't exist
+- `UNAUTHORIZED` - Authentication failed
+
+### Frontend Error Handling Utilities
+
+Use helper functions for consistent error handling:
+
+```javascript
+// frontend/src/utils/errorHandler.js
+
+import { formatErrorMessage, logApiError } from "../utils/errorHandler";
+
+try {
+  await api.post("/endpoint", data);
+} catch (error) {
+  // Format error with action items
+  const errorMsg = formatErrorMessage(error);
+
+  // Log to console with full details
+  logApiError("Operation Name", error);
+
+  // Show to user
+  toast.error(errorMsg);
+}
+```
+
+**What `formatErrorMessage()` does**:
+
+1. Extracts error message from `error.response.data.error`
+2. Adds "📋 Action Required" if `actionRequired` field exists
+3. Adds helpful links for known error types (KYC, billing, etc.)
+4. Returns formatted multi-line string
+
+### Toast Notifications
+
+**Setup** (already done in App.jsx):
+
+```javascript
+import { ToastProvider } from "./contexts/ToastContext";
+
+<ToastProvider>
+  <YourApp />
+</ToastProvider>;
+```
+
+**Usage in Components**:
+
+```javascript
+import { useToast } from "../contexts/ToastContext";
+
+function MyComponent() {
+  const toast = useToast();
+
+  // Success
+  toast.success("Order created successfully!");
+
+  // Error (shows for 5 seconds by default)
+  toast.error("Failed to save changes");
+
+  // Error with longer duration (for action items)
+  toast.error(errorMessage, 8000); // 8 seconds
+
+  // Warning
+  toast.warning("This action cannot be undone");
+
+  // Info
+  toast.info("Processing in background...");
+}
+```
+
+**Toast Features**:
+
+- ✅ Animated slide-in/out (framer-motion)
+- ✅ Auto-dismiss after duration (0 = no auto-dismiss)
+- ✅ Manual close button
+- ✅ Dark mode support
+- ✅ Multi-line messages (use `\n\n` for paragraphs)
+- ✅ Stacks multiple toasts vertically
+- ✅ Icons for each type (success, error, warning, info)
+
+### Error Handling Best Practices
+
+```javascript
+// ✅ GOOD - Complete error handling
+try {
+  const response = await api.post("/admin/orders", orderData);
+  toast.success("Order created successfully!");
+  navigate(`/orders/${response.data._id}`);
+} catch (error) {
+  // 1. Format error with action items
+  const errorMsg = formatErrorMessage(error);
+
+  // 2. Log to console (for debugging)
+  logApiError("Create Order", error);
+
+  // 3. Show toast notification
+  toast.error(errorMsg, 8000);
+
+  // 4. Optionally update local state
+  setError(errorMsg);
+}
+
+// ❌ AVOID - Vague error handling
+try {
+  await api.post("/admin/orders", orderData);
+} catch (error) {
+  alert("Error!"); // Not helpful!
+}
+
+// ❌ AVOID - Wrong error structure
+try {
+  await api.post("/admin/orders", orderData);
+} catch (error) {
+  const msg = error.data?.error; // ❌ Wrong! Use error.response.data
+}
+```
+
+### Error Logging Standards
+
+```javascript
+// ✅ GOOD - Grouped console logging
+console.group("❌ Create Order Error");
+console.error("Message:", error.message);
+console.error("Status:", error.response?.status);
+console.error("Data:", error.response?.data);
+console.groupEnd();
+
+// Or use the helper:
+logApiError("Create Order", error);
+```
+
+### Shiprocket-Specific Error Handling
+
+```javascript
+// Backend detects KYC errors
+if (shiprocketMessage.includes("KYC")) {
+  error.errorType = "KYC_REQUIRED";
+  error.actionRequired = "Complete KYC verification in Shiprocket dashboard";
+}
+
+// Frontend shows helpful guidance
+// formatErrorMessage() automatically adds:
+// 📋 Action Required: Complete KYC verification...
+// 🔗 Complete KYC at: https://app.shiprocket.in/settings
+```
+
+**Result**: User sees clear, actionable error messages instead of cryptic API responses.
+
+---
+
 ## File Naming & Organization
 
 ### Backend Conventions
@@ -643,6 +838,136 @@ console.log("API Key:", apiKey);  // NEVER DO THIS
 if (!jobId || typeof jobId !== "string") {
   return res.status(400).json({ error: "Invalid job ID" });
 }
+```
+
+#### 5. Data Minimization & Response Security
+
+**CRITICAL PRINCIPLE**: Never send unnecessary data to the frontend. Expose only what's needed for the specific use case.
+
+**Why This Matters**:
+
+- Reduces payload size (faster responses)
+- Prevents accidental exposure of sensitive fields (\_id, internal metadata)
+- Reduces attack surface (less data = less to exploit)
+- Improves performance (less data to serialize/deserialize)
+
+```javascript
+// ❌ BAD - Sending everything
+const products = await Product.find({ status: "published" });
+res.json({ data: products }); // Sends ALL fields including internal ones
+
+// ✅ GOOD - Use .select() to limit fields
+const products = await Product.find({ status: "published" })
+  .select("name sku price.amount image.thumbnailGridFsId") // Only what frontend needs
+  .lean(); // Converts to plain JS object (faster, no mongoose overhead)
+
+res.json({ data: products });
+
+// ✅ BETTER - Transform to match frontend contract
+const products = await Product.find({ status: "published" })
+  .select("_id sku name price.amount image.thumbnailGridFsId")
+  .limit(10)
+  .lean();
+
+// Map to frontend-friendly structure
+const transformed = products.map((p) => ({
+  _id: p._id,
+  sku: p.sku,
+  name: p.name,
+  pricing: { mrp: p.price?.amount || 0 },
+  images: { thumbnail: p.image?.thumbnailGridFsId },
+}));
+
+res.json({ success: true, data: transformed });
+```
+
+**When to use .lean()**:
+
+- ✅ Read-only queries (listing, searching)
+- ✅ When you don't need mongoose virtuals/methods
+- ✅ Performance-critical endpoints (reduces memory usage by ~50%)
+- ❌ When you need to save/update the document
+- ❌ When you need virtuals (e.g., `product.fullPrice`)
+
+**When to share \_id**:
+
+- ✅ When frontend needs to reference the document (e.g., adding to cart, updating)
+- ✅ When frontend will make follow-up requests (e.g., "get product details")
+- ❌ For internal-only documents (e.g., audit logs, analytics)
+- ❌ When exposing sequential IDs could leak business metrics
+
+**Field Selection Best Practices**:
+
+```javascript
+// ❌ AVOID - Exposing internal metadata
+.select('name price createdBy lastModifiedBy internalNotes')
+
+// ✅ GOOD - Only public-facing fields
+.select('name price description images')
+
+// ✅ GOOD - Use projection object for complex selections
+.select({
+  name: 1,
+  'price.amount': 1,
+  'image.thumbnailGridFsId': 1,
+  _id: 1,
+  // Explicitly exclude sensitive fields
+  internalNotes: 0,
+  vendorCost: 0,
+})
+```
+
+**Real-World Example - Order Creation Product Search**:
+
+```javascript
+// User only needs: name, SKU, price, thumbnail
+// Don't send: full description, color analysis, metadata, embeddings, etc.
+
+router.get("/products/search-for-order", async (req, res) => {
+  const products = await Product.find({
+    status: "published",
+    $or: [
+      { sku: new RegExp(req.query.search, "i") },
+      { name: new RegExp(req.query.search, "i") },
+    ],
+  })
+    .select("_id sku name price.amount image.thumbnailGridFsId")
+    .limit(10)
+    .lean(); // ⚡ Performance boost
+
+  // Transform to match frontend contract
+  const transformed = products.map((p) => ({
+    _id: p._id,
+    sku: p.sku,
+    name: p.name,
+    pricing: { mrp: p.price?.amount || 0 },
+    images: { thumbnail: p.image?.thumbnailGridFsId },
+  }));
+
+  res.json({ success: true, data: transformed });
+});
+```
+
+**Security Checklist for API Responses**:
+
+- [ ] Used `.select()` to limit fields?
+- [ ] Used `.lean()` for read-only queries?
+- [ ] Excluded sensitive fields (passwords, API keys, internal notes)?
+- [ ] Only included `_id` if frontend needs it for actions?
+- [ ] Transformed mongoose structure to match frontend contract?
+- [ ] Limited results with `.limit()` to prevent DoS?
+
+**Pro Tip**: Create dedicated endpoints for different use cases instead of one endpoint that returns everything:
+
+```javascript
+// ❌ BAD - One endpoint tries to serve all use cases
+GET /api/products?full=true&minimal=false&includeStock=true
+
+// ✅ GOOD - Dedicated endpoints with clear contracts
+GET /api/products              // Full product list with all details
+GET /api/products/search-for-order  // Minimal fields for order creation
+GET /api/products/:id/details  // Single product with all details
+GET /api/products/:id/stock    // Just stock info
 ```
 
 ### Frontend Security

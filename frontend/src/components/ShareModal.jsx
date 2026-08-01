@@ -33,7 +33,9 @@ export default function ShareModal({
   const [showQR, setShowQR] = useState(false); // QR code is now collapsible
   const canvasRef = useRef(null);
 
-  const shareUrl = `${window.location.origin}/products/${productSlug}`;
+  // Use Vite's base URL to ensure correct path prefix
+  const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
+  const shareUrl = `${window.location.origin}${basePath}/products/${productSlug}`;
 
   // Generate QR code when user expands QR section
   useEffect(() => {

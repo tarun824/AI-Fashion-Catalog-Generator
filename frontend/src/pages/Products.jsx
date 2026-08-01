@@ -26,6 +26,7 @@ export default function Products() {
   const [sortOrder, setSortOrder] = useState("desc");
   const [page, setPage] = useState(1);
   const limit = 20;
+  const [copiedSku, setCopiedSku] = useState(null);
 
   useEffect(() => {
     loadCategories();
@@ -159,6 +160,16 @@ export default function Products() {
     );
   };
 
+  const copySku = async (sku) => {
+    try {
+      await navigator.clipboard.writeText(sku);
+      setCopiedSku(sku);
+      setTimeout(() => setCopiedSku(null), 2000);
+    } catch (err) {
+      console.error("Failed to copy SKU:", err);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -242,12 +253,14 @@ export default function Products() {
             </div>
           </div>
 
-          <button
-            type="submit"
-            className="px-6 py-2 bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 text-white font-medium rounded-lg transition"
-          >
-            Search
-          </button>
+          <div className="flex items-center gap-4">
+            <button
+              type="submit"
+              className="px-6 py-2 bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 text-white font-medium rounded-lg transition"
+            >
+              Search
+            </button>
+          </div>
         </form>
       </div>
 
@@ -390,22 +403,37 @@ export default function Products() {
                       <input
                         type="checkbox"
                         checked={selectedProducts.includes(product._id)}
-                        onChange={() => toggleSelect(product._id)}
+                        onChange={(e) => {
+                          e.preventDefault();
+                          toggleSelect(product._id);
+                        }}
+                        onClick={(e) => e.stopPropagation()}
                         className="rounded border-gray-300"
                       />
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center space-x-3">
                         {product.images?.thumbnail?.gridFsId && (
-                          <img
-                            src={api.getImageUrl(
-                              product.images.thumbnail.gridFsId,
+                          <div className="relative flex-shrink-0">
+                            <img
+                              src={api.getImageUrl(
+                                product.images.thumbnail.gridFsId,
+                              )}
+                              alt={product.name}
+                              className="w-12 h-12 rounded object-cover"
+                            />
+                            {/* Image count badge - show total image count if > 1 */}
+                            {(product.imageGallery?.length > 1 ||
+                              product.images?.gallery?.length > 1) && (
+                              <div className="absolute -top-1 -right-1 bg-indigo-600 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+                                {product.imageGallery?.length ||
+                                  product.images?.gallery?.length ||
+                                  1}
+                              </div>
                             )}
-                            alt={product.name}
-                            className="w-12 h-12 rounded object-cover"
-                          />
+                          </div>
                         )}
-                        <div>
+                        <div className="min-w-0 flex-1">
                           <p className="font-medium text-gray-900 dark:text-white">
                             {product.name}
                           </p>
@@ -415,8 +443,50 @@ export default function Products() {
                         </div>
                       </div>
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400 font-mono">
-                      {product.sku}
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm text-gray-500 dark:text-gray-400 font-mono">
+                          {product.sku}
+                        </span>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            copySku(product.sku);
+                          }}
+                          className="p-1 text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded transition"
+                          title="Copy SKU"
+                        >
+                          {copiedSku === product.sku ? (
+                            <svg
+                              className="w-4 h-4 text-green-600"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M5 13l4 4L19 7"
+                              />
+                            </svg>
+                          ) : (
+                            <svg
+                              className="w-4 h-4"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
+                              />
+                            </svg>
+                          )}
+                        </button>
+                      </div>
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-700 dark:text-gray-300">
                       {product.category || (
@@ -639,7 +709,7 @@ export default function Products() {
           }}
           productName={productToShare.name}
           productSlug={productToShare.slug}
-          productPrice={productToShare.price}
+          productPrice={productToShare.price?.amount}
         />
       )}
     </div>

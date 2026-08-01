@@ -36,7 +36,10 @@ export default function OneClickShip({
         onSuccess && onSuccess(response.data);
       }, 1500);
     } catch (error) {
-      alert(error.response?.data?.error || "Failed to ship order");
+      const errorData = error.response?.data || {};
+      const errorMsg =
+        errorData.error || error.message || "Failed to ship order";
+      alert(errorMsg);
       setLoading(false);
     }
   };

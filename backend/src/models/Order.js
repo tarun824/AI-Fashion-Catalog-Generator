@@ -365,6 +365,33 @@ const orderSchema = new Schema(
         type: [trackingScanSchema],
         default: [],
       },
+
+      // Error tracking
+      lastError: {
+        message: {
+          type: String,
+          default: null,
+        },
+        stage: {
+          type: String,
+          enum: [
+            "create_order",
+            "assign_courier",
+            "schedule_pickup",
+            "tracking",
+            null,
+          ],
+          default: null,
+        },
+        timestamp: {
+          type: Date,
+          default: null,
+        },
+        details: {
+          type: Schema.Types.Mixed,
+          default: null,
+        },
+      },
     },
 
     // Webhook event history (for audit/debugging)
@@ -416,13 +443,10 @@ const orderSchema = new Schema(
   },
 );
 
-// Indexes for efficient querying
-orderSchema.index({ orderNumber: 1 });
+// Indexes for efficient querying (compound indexes only - single field indexes are defined inline)
 orderSchema.index({ "customer.phone": 1 });
 orderSchema.index({ "customer.email": 1 });
 orderSchema.index({ status: 1, createdAt: -1 });
-orderSchema.index({ "payment.status": 1 });
-orderSchema.index({ source: 1 });
 orderSchema.index({ createdAt: -1 });
 
 /**

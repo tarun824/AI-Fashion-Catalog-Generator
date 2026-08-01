@@ -140,4 +140,41 @@ router.post("/mark-complete", async (req, res) => {
   }
 });
 
+/**
+ * POST /api/admin/setup/fix-published-products
+ * Set publishedAt for published products that don't have it
+ */
+router.post("/fix-published-products", async (req, res) => {
+  try {
+    // Set publishedAt for published products missing it
+    const result = await Product.updateMany(
+      { status: "published", publishedAt: { $exists: false } },
+      { $set: { publishedAt: new Date() } },
+    );
+
+    // Also remove legacy isPublished field if it exists
+    await Product.updateMany(
+      { isPublished: { $exists: true } },
+      { $unset: { isPublished: "" } },
+    );
+
+    console.log(`✓ Fixed ${result.modifiedCount} published products`);
+
+    res.json({
+      success: true,
+      message: `Fixed ${result.modifiedCount} product(s)`,
+      data: {
+        matched: result.matchedCount,
+        modified: result.modifiedCount,
+      },
+    });
+  } catch (error) {
+    console.error("Error fixing products:", error);
+    res.status(500).json({
+      success: false,
+      error: "Failed to fix products",
+    });
+  }
+});
+
 export default router;

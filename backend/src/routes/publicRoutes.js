@@ -126,9 +126,8 @@ router.get("/products", async (req, res) => {
       featured,
     } = req.query;
 
-    // Build query
+    // Build query - only show published products
     const query = {
-      isPublished: true,
       status: "published",
     };
 
@@ -389,7 +388,6 @@ router.post("/search", async (req, res) => {
 
     // Build base query
     const query = {
-      isPublished: true,
       status: "published",
     };
 
@@ -526,7 +524,6 @@ router.get("/products/:id/similar", async (req, res) => {
     // Check if product exists and is published
     const product = await Product.findOne({
       _id: id,
-      isPublished: true,
       status: "published",
     });
 
@@ -538,7 +535,6 @@ router.get("/products/:id/similar", async (req, res) => {
     // For now, find similar by category/fabric/occasion
     const query = {
       _id: { $ne: product._id },
-      isPublished: true,
       status: "published",
       $or: [
         { fabric: product.fabric },
@@ -585,7 +581,7 @@ router.get("/products/:id/similar", async (req, res) => {
  */
 router.get("/filters", async (req, res) => {
   try {
-    const query = { isPublished: true, status: "published" };
+    const query = { status: "published" };
 
     // Get distinct values for each filter
     const [fabrics, occasions, workTypes, colors] = await Promise.all([
