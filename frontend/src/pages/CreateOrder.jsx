@@ -261,15 +261,19 @@ export default function CreateOrder() {
 
           {/* Customer Form Fields */}
           <div className="border-t border-gray-200 dark:border-gray-700 pt-6">
-            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
               {selectedCustomer
                 ? "Review and edit customer details if needed:"
                 : "Enter new customer details:"}
             </p>
+            <p className="text-xs text-blue-600 dark:text-blue-400 mb-4 bg-blue-50 dark:bg-blue-900/20 p-2 rounded">
+              ℹ️ Name, Phone, Address, City, State, and Pincode are required for
+              Shiprocket shipping.
+            </p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Name *
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Name <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="text"
@@ -278,12 +282,13 @@ export default function CreateOrder() {
                     setCustomer({ ...customer, name: e.target.value })
                   }
                   required
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  placeholder="Customer full name"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Phone *
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Phone <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="tel"
@@ -292,12 +297,14 @@ export default function CreateOrder() {
                     setCustomer({ ...customer, phone: e.target.value })
                   }
                   required
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  placeholder="10-digit mobile number"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
                 />
               </div>
               <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Email
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Email{" "}
+                  <span className="text-gray-400 text-xs">(Optional)</span>
                 </label>
                 <input
                   type="email"
@@ -305,12 +312,13 @@ export default function CreateOrder() {
                   onChange={(e) =>
                     setCustomer({ ...customer, email: e.target.value })
                   }
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  placeholder="customer@example.com"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
                 />
               </div>
               <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Address Line 1
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Address Line 1 <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="text"
@@ -321,12 +329,15 @@ export default function CreateOrder() {
                       address: { ...customer.address, line1: e.target.value },
                     })
                   }
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  required
+                  placeholder="House/Flat number, Street name"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
                 />
               </div>
               <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Address Line 2
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Address Line 2{" "}
+                  <span className="text-gray-400 text-xs">(Optional)</span>
                 </label>
                 <input
                   type="text"
@@ -337,12 +348,13 @@ export default function CreateOrder() {
                       address: { ...customer.address, line2: e.target.value },
                     })
                   }
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  placeholder="Landmark, Area"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  City
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  City <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="text"
@@ -353,12 +365,14 @@ export default function CreateOrder() {
                       address: { ...customer.address, city: e.target.value },
                     })
                   }
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  required
+                  placeholder="Bangalore"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  State
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  State <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="text"
@@ -369,12 +383,14 @@ export default function CreateOrder() {
                       address: { ...customer.address, state: e.target.value },
                     })
                   }
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  required
+                  placeholder="Karnataka"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Pincode
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Pincode <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="text"
@@ -385,12 +401,15 @@ export default function CreateOrder() {
                       address: { ...customer.address, pincode: e.target.value },
                     })
                   }
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  required
+                  placeholder="560001"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Country
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Country{" "}
+                  <span className="text-gray-400 text-xs">(Optional)</span>
                 </label>
                 <input
                   type="text"
@@ -401,7 +420,8 @@ export default function CreateOrder() {
                       address: { ...customer.address, country: e.target.value },
                     })
                   }
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  placeholder="India"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
                 />
               </div>
             </div>

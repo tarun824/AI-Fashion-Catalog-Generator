@@ -3,6 +3,7 @@ import Order from "../models/Order.js";
 import Product from "../models/Product.js";
 import Customer from "../models/Customer.js";
 import { authMiddleware } from "../middleware/auth.js";
+import { logOrderCreated } from "../utils/auditLogger.js";
 
 const router = express.Router();
 
@@ -165,27 +166,34 @@ router.post("/", async (req, res) => {
         name: customer.name,
         phone: customer.phone,
         email: customer.email || undefined,
-        addresses: customer.address ? [{
-          label: "Default",
-          street: customer.address.line1 || "",
-          city: customer.address.city || "",
-          state: customer.address.state || "",
-          pincode: customer.address.pincode || "",
-          country: customer.address.country || "India",
-          isDefault: true,
-        }] : [],
+        addresses: customer.address
+          ? [
+              {
+                label: "Default",
+                street: customer.address.line1 || "",
+                city: customer.address.city || "",
+                state: customer.address.state || "",
+                pincode: customer.address.pincode || "",
+                country: customer.address.country || "India",
+                isDefault: true,
+              },
+            ]
+          : [],
         source: source || "manual",
         tags: ["manual-order"],
       });
 
       await customerDoc.save();
-      console.log(`✓ Created new customer: ${customerDoc.name} (${customerDoc.phone})`);
+      console.log(
+        `✓ Created new customer: ${customerDoc.name} (${customerDoc.phone})`,
+      );
     } else {
       // Update existing customer's address if provided and different
       if (customer.address && customer.address.line1) {
-        const hasAddress = customerDoc.addresses.some(addr => 
-          addr.street === customer.address.line1 && 
-          addr.pincode === customer.address.pincode
+        const hasAddress = customerDoc.addresses.some(
+          (addr) =>
+            addr.street === customer.address.line1 &&
+            addr.pincode === customer.address.pincode,
         );
 
         if (!hasAddress) {
@@ -226,12 +234,16 @@ router.post("/", async (req, res) => {
 
     await order.save();
 
+    // Log order creation
+    logOrderCreated(order, req.admin, req);
+
     // Update customer metrics
     customerDoc.totalOrders += 1;
     customerDoc.totalSpent += pricing?.total || 0;
-    customerDoc.averageOrderValue = customerDoc.totalSpent / customerDoc.totalOrders;
+    customerDoc.averageOrderValue =
+      customerDoc.totalSpent / customerDoc.totalOrders;
     customerDoc.lastOrderDate = new Date();
-    
+
     // Update customer type based on orders
     if (customerDoc.totalOrders >= 10) {
       customerDoc.customerType = "vip";

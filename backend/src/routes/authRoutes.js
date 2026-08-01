@@ -1,14 +1,17 @@
 import express from "express";
 import Admin from "../models/Admin.js";
 import { generateToken, authMiddleware } from "../middleware/auth.js";
+import { authLimiter } from "../middleware/security.js";
+import { logAdminLogin, logAdminLogout } from "../utils/auditLogger.js";
 
 const router = express.Router();
 
 /**
  * POST /api/admin/auth/login
  * Admin login - returns JWT token
+ * Rate limited: 10 attempts per 15 minutes
  */
-router.post("/login", async (req, res) => {
+router.post("/login", authLimiter, async (req, res) => {
   try {
     const { email, password } = req.body;
 
@@ -42,6 +45,9 @@ router.post("/login", async (req, res) => {
 
     // Update last login
     await admin.updateLastLogin();
+
+    // Log successful login
+    logAdminLogin(admin, req);
 
     // Generate JWT token
     const token = generateToken(admin);

@@ -5,6 +5,7 @@ import morgan from "morgan";
 import router from "./routes/routes.js";
 import { connectDatabase } from "./config/database.js";
 import Admin from "./models/Admin.js";
+import { applySecurityMiddleware } from "./middleware/security.js";
 
 dotenv.config();
 
@@ -44,6 +45,10 @@ app.use(
     credentials: true,
   }),
 );
+
+// Apply security middleware (helmet, sanitization, etc.)
+applySecurityMiddleware(app);
+
 app.use(
   express.json({
     limit: "10mb",

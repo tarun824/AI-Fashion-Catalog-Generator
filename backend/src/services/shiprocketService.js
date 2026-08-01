@@ -646,28 +646,55 @@ class ShiprocketService {
   /**
    * Handle webhook from Shiprocket
    * Updates order status based on shipment updates
+   *
+   * Shiprocket webhook payload fields:
+   * - awb: AWB tracking number
+   * - courier_name: Courier company name
+   * - current_status: Human-readable status (e.g., "In Transit to Destination")
+   * - shipment_status: Status code (e.g., "IN TRANSIT", "DELIVERED", "RTO")
+   * - current_timestamp: Timestamp of the event
+   * - order_id: Your order number
+   * - sr_order_id: Shiprocket's internal order ID
+   * - etd: Expected time of delivery
+   * - scans: Array of tracking events with date, status, activity, location
+   * - is_return: Whether this is a return shipment (0 or 1)
+   * - pod_status: Proof of delivery status
+   * - delivered_date: Date when delivered (if applicable)
    */
   async handleWebhook(webhookData) {
     try {
       const {
         awb,
         order_id,
+        sr_order_id,
         shipment_status,
         current_status,
         delivered_date,
         scans,
+        courier_name,
+        etd,
+        is_return,
+        pod_status,
+        current_timestamp,
       } = webhookData;
 
       console.log(
-        `📦 Shiprocket Webhook: Order ${order_id}, Status: ${current_status}`,
+        `📦 Shiprocket Webhook: Order ${order_id || sr_order_id}, AWB: ${awb}, Status: ${current_status}`,
       );
 
       return {
         awb,
-        orderId: order_id,
+        orderId: sr_order_id || order_id,
+        orderNumber: order_id,
         shipmentStatus: shipment_status,
         currentStatus: current_status,
         deliveredDate: delivered_date,
+        courierName: courier_name,
+        etd,
+        isReturn: is_return === 1,
+        podStatus: pod_status,
+        eventTime: current_timestamp,
+        scans: scans || [],
         latestScan: scans?.[scans.length - 1],
       };
     } catch (error) {

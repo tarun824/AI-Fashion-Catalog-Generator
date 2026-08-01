@@ -1,14 +1,19 @@
 import express from "express";
 import Vendor from "../models/Vendor.js";
-import { generateVendorToken, vendorAuthMiddleware } from "../middleware/auth.js";
+import {
+  generateVendorToken,
+  vendorAuthMiddleware,
+} from "../middleware/auth.js";
+import { authLimiter } from "../middleware/security.js";
 
 const router = express.Router();
 
 /**
  * POST /api/vendor/auth/register
  * Vendor self-registration - creates a vendor account and returns a JWT token
+ * Rate limited: 10 attempts per 15 minutes
  */
-router.post("/register", async (req, res) => {
+router.post("/register", authLimiter, async (req, res) => {
   try {
     const { email, password, businessName, contactPhone } = req.body;
 
@@ -66,8 +71,9 @@ router.post("/register", async (req, res) => {
 /**
  * POST /api/vendor/auth/login
  * Vendor login - returns JWT token
+ * Rate limited: 10 attempts per 15 minutes
  */
-router.post("/login", async (req, res) => {
+router.post("/login", authLimiter, async (req, res) => {
   try {
     const { email, password } = req.body;
 

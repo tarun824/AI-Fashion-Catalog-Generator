@@ -73,9 +73,71 @@ const statusHistorySchema = new Schema({
     type: Schema.Types.ObjectId,
     ref: "Admin",
   },
+  // Source of the update: manual, webhook, system
+  source: {
+    type: String,
+    enum: ["manual", "webhook", "system"],
+    default: "manual",
+  },
   timestamp: {
     type: Date,
     default: Date.now,
+  },
+});
+
+/**
+ * Tracking Scan Sub-Schema
+ * Stores detailed tracking events from Shiprocket webhooks
+ */
+const trackingScanSchema = new Schema({
+  date: {
+    type: Date,
+    required: true,
+  },
+  status: {
+    type: String,
+    required: true,
+  },
+  activity: {
+    type: String,
+    default: "",
+  },
+  location: {
+    type: String,
+    default: "",
+  },
+  remarks: {
+    type: String,
+    default: "",
+  },
+});
+
+/**
+ * Webhook Event Sub-Schema
+ * Stores raw webhook events for debugging/audit
+ */
+const webhookEventSchema = new Schema({
+  receivedAt: {
+    type: Date,
+    default: Date.now,
+  },
+  source: {
+    type: String,
+    enum: ["shiprocket", "razorpay", "flipkart", "amazon", "other"],
+    required: true,
+  },
+  eventType: {
+    type: String,
+    default: "status_update",
+  },
+  // Store the raw payload for debugging
+  payload: {
+    type: Schema.Types.Mixed,
+    default: {},
+  },
+  processed: {
+    type: Boolean,
+    default: true,
   },
 });
 
@@ -298,6 +360,17 @@ const orderSchema = new Schema(
         type: Date,
         default: null,
       },
+      // Detailed tracking history from webhooks
+      trackingScans: {
+        type: [trackingScanSchema],
+        default: [],
+      },
+    },
+
+    // Webhook event history (for audit/debugging)
+    webhookHistory: {
+      type: [webhookEventSchema],
+      default: [],
     },
 
     // Order Source

@@ -44,7 +44,7 @@ export default function Customers() {
   const loadInsights = async () => {
     try {
       const response = await api.get("/admin/customers/insights");
-      const insightsData = response.data?.insights || response.data || {};
+      const insightsData = response.insights || {};
       setInsights({
         totalCustomers: insightsData.totalCustomers || 0,
         segments: insightsData.segments || {
@@ -90,8 +90,8 @@ export default function Customers() {
       }
 
       const response = await api.get(`/admin/customers?${params}`);
-      setCustomers(response.data.customers);
-      setPagination(response.data.pagination);
+      setCustomers(response.customers || []);
+      setPagination(response.pagination || {});
     } catch (err) {
       setError(err.message);
     } finally {

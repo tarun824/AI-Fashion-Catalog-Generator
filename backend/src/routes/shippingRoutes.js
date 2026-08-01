@@ -472,52 +472,6 @@ router.post("/bulk-ship", async (req, res) => {
 });
 
 /**
- * POST /webhook/shiprocket
- * Handle Shiprocket webhooks (public endpoint)
- */
-router.post("/webhook", async (req, res) => {
-  try {
-    const webhookData = await shiprocketService.handleWebhook(req.body);
-
-    // Find order by Shiprocket order ID or AWB
-    const order = await Order.findOne({
-      $or: [
-        { "shipping.shiprocketOrderId": webhookData.orderId },
-        { "shipping.awbCode": webhookData.awb },
-      ],
-    });
-
-    if (order) {
-      // Update order status based on shipment status
-      order.shipping.currentStatus = webhookData.currentStatus;
-      order.shipping.shipmentStatus = webhookData.shipmentStatus;
-      order.shipping.lastUpdated = new Date();
-
-      // Map Shiprocket status to our status
-      if (webhookData.shipmentStatus === "DELIVERED") {
-        order.status = "delivered";
-        order.shipping.deliveredDate = webhookData.deliveredDate;
-      } else if (webhookData.shipmentStatus === "RTO") {
-        order.status = "returned";
-      } else if (webhookData.currentStatus?.includes("Transit")) {
-        order.status = "shipped";
-      }
-
-      await order.save();
-
-      console.log(
-        `✓ Order ${order.orderNumber} updated via webhook: ${webhookData.currentStatus}`,
-      );
-    }
-
-    res.json({ success: true, message: "Webhook processed" });
-  } catch (error) {
-    console.error("Error processing webhook:", error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-/**
  * GET /api/admin/shipping/pickup-locations
  * Get list of configured pickup locations from Shiprocket
  */
