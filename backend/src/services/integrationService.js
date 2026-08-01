@@ -121,10 +121,14 @@ class IntegrationService {
 
   /**
    * Get webhook URL for a specific integration
+   * These are public endpoints (no auth required) for external services to call
    */
   getWebhookUrl(integrationId) {
     const baseUrl = process.env.BACKEND_URL || "http://localhost:5000";
-    return `${baseUrl}/api/ai-fashion-generator/webhooks/${integrationId}`;
+    const apiPrefix = process.env.API_PREFIX || "/api/ai-fashion-generator";
+
+    // All webhooks are at /webhooks/{integrationId} (public, no auth)
+    return `${baseUrl}${apiPrefix}/webhooks/${integrationId}`;
   }
 
   /**

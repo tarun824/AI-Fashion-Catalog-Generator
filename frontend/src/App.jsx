@@ -31,6 +31,7 @@ import CustomerDetail from "./pages/CustomerDetail";
 import Orders from "./pages/Orders";
 import OrderDetail from "./pages/OrderDetail";
 import CreateOrder from "./pages/CreateOrder";
+import Audits from "./pages/Audits";
 
 // Vendor Pages
 import VendorLogin from "./pages/VendorLogin";
@@ -92,6 +93,7 @@ function App() {
                   <Route path="batch-upload" element={<BatchUploadPage />} />
                   <Route path="search" element={<SearchPage />} />
                   <Route path="integrations" element={<Integrations />} />
+                  <Route path="audits" element={<Audits />} />
                 </Route>
 
                 {/* Legacy admin routes redirect */}

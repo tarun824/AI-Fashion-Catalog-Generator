@@ -3,23 +3,18 @@ import multer from "multer";
 import { rateLimit } from "express-rate-limit";
 import Product from "../models/Product.js";
 import Category from "../models/Category.js";
+import { secureImageFilter } from "../middleware/security.js";
 
 const router = express.Router();
 
-// Configure multer for image uploads (visual search)
+// Configure multer for image uploads (visual search) with secure filtering
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
     fileSize: 10 * 1024 * 1024, // 10MB max
     files: 1,
   },
-  fileFilter: (_req, file, cb) => {
-    if (!file.mimetype.startsWith("image/")) {
-      cb(new Error("Only image files are allowed"));
-      return;
-    }
-    cb(null, true);
-  },
+  fileFilter: secureImageFilter, // Enhanced security filter
 });
 
 // Rate limiting for public API (100 requests per 15 minutes per IP)
