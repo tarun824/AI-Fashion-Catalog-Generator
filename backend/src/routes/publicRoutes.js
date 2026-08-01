@@ -285,11 +285,8 @@ router.get("/products/:slug", async (req, res) => {
   try {
     const { slug } = req.params;
 
-    const product = await Product.findOne({
-      slug,
-      isPublished: true,
-      status: "published",
-    })
+    // Find product by slug (no status filter - allows viewing drafts/archived)
+    const product = await Product.findOne({ slug })
       .populate("categories.categoryId", "name slug type")
       .lean();
 
@@ -306,6 +303,7 @@ router.get("/products/:slug", async (req, res) => {
       sku: product.sku,
       name: product.name,
       slug: product.slug,
+      status: product.status, // Include status so frontend can show banners
       description: product.description,
       category: product.category,
       categories: product.categories || [],
@@ -347,6 +345,29 @@ router.get("/products/:slug", async (req, res) => {
   } catch (error) {
     console.error("Error fetching product:", error);
     res.status(500).json({ error: "Failed to fetch product" });
+  }
+});
+
+/**
+ * POST /api/public/products/:slug/share
+ * Track product share count
+ */
+router.post("/products/:slug/share", async (req, res) => {
+  try {
+    const { slug } = req.params;
+
+    await Product.findOneAndUpdate(
+      { slug },
+      {
+        $inc: { shareCount: 1 },
+        $set: { lastSharedAt: new Date() },
+      },
+    );
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error("Error tracking share:", error);
+    res.status(500).json({ error: "Failed to track share" });
   }
 });
 
@@ -596,7 +617,10 @@ router.get("/filters", async (req, res) => {
       occasions: occasions.filter(Boolean).sort(),
       workTypes: workTypes.filter(Boolean).sort(),
       colors: colors.filter(Boolean).sort(),
-      priceRange: priceStats[0] || { min: 0, max: 50000 },
+      priceRange: priceStats[0] || { 
+        min: 0, 
+        max: parseInt(process.env.DEFAULT_MAX_PRICE) || 50000 
+      },
     });
   } catch (error) {
     console.error("Error fetching filters:", error);

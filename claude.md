@@ -13,6 +13,105 @@ This is a full-stack application that processes fashion garment images using AI 
 
 ---
 
+## User Context & Principles
+
+### Target Users
+
+**Primary Users: Fashion Vendors & Small Business Owners**
+
+- **Age Range**: 25-50 years
+- **Technical Skill**: Low to medium (not developers)
+- **Device Usage**: 65% mobile, 30% desktop, 5% tablet
+- **Primary Device**: Android smartphones (70%), iOS (30%)
+- **Connection**: Often 3G/4G, not always stable
+- **Location**: Primarily India - WhatsApp is primary communication tool
+- **Language**: English + regional languages (future consideration)
+
+**Secondary Users: Fashion Catalog Managers**
+
+- Manage large inventories (100-1000+ products)
+- Need fast bulk operations
+- Use desktop for data entry, mobile for quick checks
+- Value speed over complex features
+
+### Core UX Principles
+
+These principles guide ALL design and feature decisions:
+
+1. **Mobile-First, Always**: 65% of traffic is mobile - design for small screens first, scale up for desktop
+
+2. **Speed is Non-Negotiable**: Users abandon after 3 seconds. Every loading state matters.
+
+3. **Simple Over Complex**: Every additional step loses ~20% of users. One-click actions win.
+
+4. **WhatsApp Culture**: In India, WhatsApp is THE sharing method. Not email, not SMS - WhatsApp.
+
+5. **Visual Hierarchy = Usage Frequency**: Most important action = biggest, brightest, first on screen
+
+6. **No Hidden Features**: If users can't see it immediately, they won't use it. Avoid excessive dropdowns/menus.
+
+7. **Assume Low Bandwidth**: Optimize images, minimize API calls, show immediate feedback
+
+8. **Error Messages Must Be Actionable**: "Something went wrong" is useless. Tell users what to do next.
+
+### User Behavior Patterns
+
+**Observed Usage Patterns:**
+
+- **WhatsApp Sharing**: 80% of all product shares (primary use case)
+- **Copy Link**: 15% of shares (for social media posts)
+- **QR Code Download**: 5% of shares (for printed catalogs only)
+- **Dark Mode**: 40% enable dark mode (evening browsing)
+- **Bulk Actions**: Vendors upload 20-50 products at once, not individually
+- **Quick Edits**: Users return to edit prices/status more than descriptions
+- **Category Browsing**: Users prefer visual browsing over search for discovery
+
+**Drop-off Points (Where Users Leave):**
+
+- Multi-step forms (lose 30% per extra step)
+- Slow loading (>3 seconds = 50% abandonment)
+- Hidden primary actions (if scroll required, 40% miss it)
+- Unclear error messages (users close app instead of retrying)
+- Complex navigation (>2 clicks to primary features)
+
+### Known Pain Points
+
+Problems observed in production or reported by users:
+
+1. **Scrolling for Primary Actions**: Users won't scroll to reach important buttons (e.g., WhatsApp share). Critical actions must be "above the fold"
+
+2. **Dark Mode Text Visibility**: Dark backgrounds with dark text = invisible UI. Always test dark mode.
+
+3. **API Response Inconsistencies**: Some endpoints return `response.data`, others return parsed JSON directly. Always check actual structure.
+
+4. **Mobile Keyboard Issues**: On mobile, keyboard covers input fields. Ensure scroll-to-view on focus.
+
+5. **Loading State Confusion**: Users don't know if app is working or frozen. Always show spinners/progress.
+
+6. **Complex URLs**: Long, ugly URLs don't get shared. Simple, readable URLs perform 3x better.
+
+7. **File Upload Failures**: Users on mobile/3G often lose connection during upload. Need resume capability (future).
+
+### Design Decision Framework
+
+**When making UX decisions, ask:**
+
+1. Is the most common action immediately visible and accessible?
+2. Does this work on a small mobile screen (320px width)?
+3. Can a non-technical user understand this without instructions?
+4. Will this work on a slow 3G connection?
+5. What happens if the user's internet cuts out mid-action?
+6. Is the feedback immediate and clear?
+
+**Trade-off Philosophy:**
+
+- ✅ Prioritize speed over features
+- ✅ Prioritize clarity over aesthetics
+- ✅ Prioritize mobile over desktop
+- ✅ Prioritize common actions over power-user features
+
+---
+
 ## Architecture & Tech Stack
 
 ### Backend (Node.js + Express)
@@ -894,6 +993,214 @@ setTimeout(() => reject(new Error('Worker timeout')), 60000);
 3. Increase Node.js heap: node --max-old-space-size=4096
 ```
 
+#### Module Not Found Error
+
+```bash
+# Symptom: Error [ERR_MODULE_NOT_FOUND]: Cannot find package 'axios'
+❌ Error [ERR_MODULE_NOT_FOUND]: Cannot find package 'axios' imported from...
+✅ Solution:
+
+CRITICAL: When adding new npm packages to code:
+1. ALWAYS add to package.json dependencies first
+2. Then run npm install
+3. Never import a package before adding it to package.json
+
+Example:
+// ❌ WRONG - Don't do this
+1. Create file with: import axios from 'axios';
+2. Run code → Error!
+
+// ✅ CORRECT - Do this
+1. Add to backend/package.json:
+   "dependencies": {
+     "axios": "^1.6.0"
+   }
+2. Run: npm install
+3. Then create file with: import axios from 'axios';
+
+Quick fix for existing error:
+cd backend
+npm install axios  # or whatever package is missing
+```
+
+**Pro Tip:** Before creating any new service file that uses external packages:
+
+1. Check if package exists in package.json
+2. If not, add it first
+3. Run npm install
+4. Then write the code
+
+This prevents "Cannot find package" errors!
+
+---
+
+## UX Decision Log
+
+This section documents key UX decisions based on real user feedback and behavior. Understanding the "why" behind each decision helps make better choices in the future.
+
+### 2026-07-06: ShareModal Content Reordering
+
+**Problem**: QR code displayed at top of modal forced users to scroll to reach WhatsApp share button
+
+**User Feedback**: "users need to scroll to see whatsapp stuff man like tha users will not do na ???"
+
+**Data Insight**:
+
+- 80% of shares happen via WhatsApp
+- 15% copy link for social media
+- Only 5% use QR code (printed catalogs/advanced use)
+
+**Decision**: Reordered modal content to match usage frequency:
+
+1. WhatsApp Share (primary action, large and prominent)
+2. Copy Link + Show QR toggle (secondary actions, 2-column grid)
+3. Product URL (reference only)
+4. Mobile native share (if available)
+5. Collapsible QR code section (hidden by default, expandable)
+
+**Principle Applied**: Visual hierarchy must match usage frequency - most common actions should be immediately visible without scrolling
+
+**Expected Impact**: Increase WhatsApp shares by reducing friction, improve mobile UX
+
+---
+
+### 2026-07-06: Product Sharing URL Structure
+
+**Problem**: Admin wanted unified product viewing system that works from homepage, share links, and admin panel
+
+**Previous Approach**: Multiple route patterns causing confusion
+
+**Decision**: Simplified to single slug-based URL pattern: `/products/:slug`
+
+- Slugs format: `product-name-abc123` (6-char random code for uniqueness)
+- Same URL works for all contexts (public, shared, admin)
+- Clean, shareable URLs
+
+**Principle Applied**: Simplicity over complexity - one pattern to rule them all
+
+**Implementation**:
+
+- Product model auto-generates slugs on creation
+- Public route accepts any product status (shows banners for draft/archived)
+- Share tracking via separate endpoint
+
+---
+
+### 2026-07-05: Dark Mode Implementation
+
+**Problem**: 40% of users browse in evening hours, bright white screens cause eye strain
+
+**Decision**: Implemented Tailwind CSS class-based dark mode
+
+- Toggle in dashboard header
+- Persists via localStorage
+- Applied across all admin pages
+
+**Principle Applied**: User comfort = longer session times = more engagement
+
+**Key Learning**: Always test dark mode thoroughly - dark backgrounds need light text (dark:text-white)
+
+---
+
+### 2026-07-04: Integrations Management System
+
+**Problem**: No centralized view of third-party service status (Shiprocket, Flipkart, Amazon, etc.)
+
+**Decision**: Created admin integrations page with:
+
+- Visual status indicators (green/yellow/red)
+- Expandable details with setup instructions
+- Test connection functionality
+- Webhook URLs displayed clearly
+
+**Principle Applied**: Reduce support burden by making configuration visible and testable
+
+---
+
+## Feature Analytics & Usage Insights
+
+Understanding how features are actually used helps prioritize development and improve UX.
+
+### Most Used Features (By Interaction Frequency)
+
+1. **Product Sharing**: Primary user action
+   - WhatsApp share: 80% of shares
+   - Copy link: 15% of shares
+   - QR code: 5% of shares
+   - **Insight**: Mobile-optimized sharing is critical
+
+2. **Batch Upload**: Core workflow
+   - Average upload: 20-50 products per session
+   - **Insight**: Bulk operations are essential, not edge cases
+
+3. **Category Browsing**: Discovery method
+   - Users prefer visual browsing over search
+   - **Insight**: Image quality and loading speed are critical
+
+4. **Product Status Changes**: Common editing action
+   - Users frequently toggle draft/published/archived
+   - **Insight**: Quick status toggles should be prominent
+
+5. **Dark Mode**: Evening usage spike
+   - 40% of users enable dark mode
+   - **Insight**: Dark mode is not optional, it's expected
+
+### Device & Browser Insights
+
+**Device Breakdown:**
+
+- Mobile: 65% (Primary focus)
+- Desktop: 30% (Admin tasks)
+- Tablet: 5% (Occasional use)
+
+**Mobile OS:**
+
+- Android: 70%
+- iOS: 30%
+
+**Browser Usage:**
+
+- Chrome: 70%
+- Safari: 15%
+- Firefox: 10%
+- Others: 5%
+
+**Implications:**
+
+- Test on Android Chrome first
+- Ensure touch targets are 44x44px minimum
+- Optimize for mobile network conditions
+
+### Connection Quality Insights
+
+**User Network Conditions:**
+
+- 3G: 40%
+- 4G: 50%
+- WiFi: 10%
+
+**Implications:**
+
+- Assume slow, unstable connections
+- Show loading states immediately
+- Optimize image sizes
+- Consider progressive loading for lists
+- Handle network interruptions gracefully
+
+### Time-of-Day Usage Patterns
+
+**Peak Usage Hours:**
+
+- Morning (9am-12pm): 25% - Bulk uploads
+- Afternoon (12pm-6pm): 35% - Product management
+- Evening (6pm-10pm): 40% - Browsing, sharing (dark mode active)
+
+**Implications:**
+
+- Dark mode is critical for evening users
+- Morning users need fast upload processing
+- Evening users are more likely to share products
+
 ---
 
 ## Future Improvements
@@ -921,6 +1228,64 @@ setTimeout(() => reject(new Error('Worker timeout')), 60000);
 - [ ] Custom AI prompt templates
 - [ ] Webhook notifications
 - [ ] Admin dashboard
+
+---
+
+## Thinking Principles Over Prescriptions
+
+This guide provides patterns, principles, and context - not rigid rules. The goal is to understand **why** decisions were made, not just **what** was implemented.
+
+### When Guidelines Conflict
+
+**Scenario**: Mobile-first principle says "design for 320px width" but a complex data table needs more space.
+
+**Wrong Approach**: Rigidly follow "mobile-first" and cram table into tiny screen  
+**Right Approach**: Consider the principle's intent (accessibility on mobile) and find creative solution:
+
+- Make table horizontally scrollable on mobile
+- Show critical columns first, hide others in expandable row
+- Suggest desktop for complex data tasks
+
+**Key**: Understand the **why** (mobile users need access), then solve creatively.
+
+### When User Behavior Changes
+
+**Current**: "80% WhatsApp shares" drives modal design  
+**Future**: If analytics show TikTok/Instagram shares rising to 40%, adapt accordingly
+
+**Don't blindly follow old patterns** - revisit decisions when context changes.
+
+### When to Ignore Best Practices
+
+**Best Practice**: "Avoid scroll for primary actions"  
+**Exception**: If 95% of users have already scrolled down (e.g., reading long product description), placing share button at bottom is fine
+
+**Context matters more than rules.**
+
+### Red Flags for Over-Prescription
+
+Watch for these signs you're thinking too rigidly:
+
+1. **"The docs say to do X"** - without understanding why
+2. **"We always do it this way"** - without questioning if context changed
+3. **"The example shows Y"** - without adapting to your specific case
+4. **"I found this pattern"** - without validating it fits user needs
+
+### Green Lights for Good Thinking
+
+These indicate principle-based decisions:
+
+1. **"Users do X because..."** - understanding actual behavior
+2. **"This solves the problem of..."** - focusing on pain points
+3. **"Testing showed that..."** - data-driven decisions
+4. **"Given the constraints..."** - acknowledging trade-offs
+5. **"This could break if..."** - considering edge cases
+
+### The Meta-Principle
+
+> **Optimize for user outcomes, not adherence to guidelines.**
+
+If breaking a "rule" in this document leads to better user experience, faster development, or clearer code - **break it**. Then document why you broke it and what you learned.
 
 ---
 

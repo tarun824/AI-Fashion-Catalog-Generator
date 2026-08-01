@@ -1,0 +1,631 @@
+import mongoose from "mongoose";
+import { nextSequence } from "./Counter.js";
+
+const { Schema } = mongoose;
+
+/**
+ * Generate order number in format: ORD-YYYYMMDD-XXX
+ * Example: ORD-20260705-001
+ */
+const generateOrderNumber = async () => {
+  const today = new Date();
+  const dateStr = today.toISOString().slice(0, 10).replace(/-/g, "");
+  const seq = await nextSequence(`order-${dateStr}`);
+  const seqCode = String(seq).padStart(3, "0");
+  return `ORD-${dateStr}-${seqCode}`;
+};
+
+/**
+ * Order Item Sub-Schema
+ * Represents individual products in an order
+ */
+const orderItemSchema = new Schema({
+  productId: {
+    type: Schema.Types.ObjectId,
+    ref: "Product",
+    required: false, // Allow manual orders without product reference
+  },
+  sku: {
+    type: String,
+    required: true,
+  },
+  name: {
+    type: String,
+    required: true,
+    trim: true,
+  },
+  quantity: {
+    type: Number,
+    required: true,
+    min: 1,
+  },
+  price: {
+    type: Number,
+    required: true,
+    min: 0,
+  },
+  subtotal: {
+    type: Number,
+    required: true,
+    min: 0,
+  },
+  // Store product snapshot at time of order
+  image: {
+    type: String,
+    default: null,
+  },
+});
+
+/**
+ * Status History Sub-Schema
+ * Track status changes over time
+ */
+const statusHistorySchema = new Schema({
+  status: {
+    type: String,
+    required: true,
+  },
+  note: {
+    type: String,
+    default: "",
+  },
+  updatedBy: {
+    type: Schema.Types.ObjectId,
+    ref: "Admin",
+  },
+  timestamp: {
+    type: Date,
+    default: Date.now,
+  },
+});
+
+/**
+ * Order Schema
+ * Complete order management with customer info, products, payments, and shipping
+ */
+const orderSchema = new Schema(
+  {
+    // Unique order identifier
+    orderNumber: {
+      type: String,
+      unique: true,
+      required: true,
+    },
+
+    // Customer Information
+    customer: {
+      name: {
+        type: String,
+        required: true,
+        trim: true,
+      },
+      phone: {
+        type: String,
+        required: true,
+        trim: true,
+      },
+      email: {
+        type: String,
+        trim: true,
+        lowercase: true,
+        default: "",
+      },
+      address: {
+        line1: { type: String, default: "" },
+        line2: { type: String, default: "" },
+        city: { type: String, default: "" },
+        state: { type: String, default: "" },
+        pincode: { type: String, default: "" },
+        country: { type: String, default: "India" },
+      },
+    },
+
+    // Order Items
+    items: {
+      type: [orderItemSchema],
+      required: true,
+      validate: {
+        validator: (items) => items && items.length > 0,
+        message: "Order must have at least one item",
+      },
+    },
+
+    // Financial Details
+    pricing: {
+      subtotal: {
+        type: Number,
+        required: true,
+        min: 0,
+      },
+      discount: {
+        type: Number,
+        default: 0,
+        min: 0,
+      },
+      tax: {
+        type: Number,
+        default: 0,
+        min: 0,
+      },
+      shippingCharge: {
+        type: Number,
+        default: 0,
+        min: 0,
+      },
+      total: {
+        type: Number,
+        required: true,
+        min: 0,
+      },
+    },
+
+    // Payment Information
+    payment: {
+      status: {
+        type: String,
+        enum: ["pending", "paid", "failed", "refunded", "partial"],
+        default: "pending",
+        index: true,
+      },
+      method: {
+        type: String,
+        enum: ["COD", "UPI", "Card", "WhatsApp", "Bank Transfer", "Other"],
+        default: "COD",
+      },
+      transactionId: {
+        type: String,
+        default: "",
+      },
+      paidAmount: {
+        type: Number,
+        default: 0,
+        min: 0,
+      },
+      paidAt: {
+        type: Date,
+        default: null,
+      },
+    },
+
+    // Order Status
+    status: {
+      type: String,
+      enum: [
+        "pending",
+        "confirmed",
+        "processing",
+        "packed",
+        "shipped",
+        "delivered",
+        "cancelled",
+        "returned",
+      ],
+      default: "pending",
+      index: true,
+    },
+
+    // Shipping Information (Shiprocket Integration)
+    shipping: {
+      // Basic shipping info
+      courier: {
+        type: String,
+        default: "",
+      },
+      trackingNumber: {
+        type: String,
+        default: "",
+      },
+      shippedAt: {
+        type: Date,
+        default: null,
+      },
+      expectedDelivery: {
+        type: Date,
+        default: null,
+      },
+      deliveredAt: {
+        type: Date,
+        default: null,
+      },
+
+      // Shiprocket-specific fields
+      shiprocketOrderId: {
+        type: Number,
+        default: null,
+      },
+      shipmentId: {
+        type: Number,
+        default: null,
+      },
+      awbCode: {
+        type: String,
+        default: "",
+        index: true,
+      },
+      courierName: {
+        type: String,
+        default: "",
+      },
+      courierId: {
+        type: Number,
+        default: null,
+      },
+      labelUrl: {
+        type: String,
+        default: "",
+      },
+      currentStatus: {
+        type: String,
+        default: "",
+      },
+      shipmentStatus: {
+        type: String,
+        default: "",
+      },
+      pickupScheduledDate: {
+        type: String,
+        default: "",
+      },
+      pickupTokenNumber: {
+        type: String,
+        default: "",
+      },
+      estimatedDeliveryDays: {
+        type: String,
+        default: "",
+      },
+      freightCharge: {
+        type: Number,
+        default: 0,
+      },
+      codCharges: {
+        type: Number,
+        default: 0,
+      },
+      totalShippingCost: {
+        type: Number,
+        default: 0,
+      },
+      lastUpdated: {
+        type: Date,
+        default: null,
+      },
+      cancelled: {
+        type: Boolean,
+        default: false,
+      },
+      cancelledAt: {
+        type: Date,
+        default: null,
+      },
+    },
+
+    // Order Source
+    source: {
+      type: String,
+      enum: ["website", "whatsapp", "phone", "email", "manual"],
+      default: "manual",
+      index: true,
+    },
+
+    // Additional Information
+    notes: {
+      type: String,
+      default: "",
+    },
+
+    internalNotes: {
+      type: String,
+      default: "",
+    },
+
+    // Status History Timeline
+    statusHistory: {
+      type: [statusHistorySchema],
+      default: [],
+    },
+
+    // Created by Admin
+    createdBy: {
+      type: Schema.Types.ObjectId,
+      ref: "Admin",
+    },
+
+    // Vendor (if order linked to specific vendor)
+    vendorId: {
+      type: Schema.Types.ObjectId,
+      ref: "Vendor",
+      default: null,
+    },
+  },
+  {
+    timestamps: true,
+  },
+);
+
+// Indexes for efficient querying
+orderSchema.index({ orderNumber: 1 });
+orderSchema.index({ "customer.phone": 1 });
+orderSchema.index({ "customer.email": 1 });
+orderSchema.index({ status: 1, createdAt: -1 });
+orderSchema.index({ "payment.status": 1 });
+orderSchema.index({ source: 1 });
+orderSchema.index({ createdAt: -1 });
+
+/**
+ * Pre-save middleware to calculate totals and generate order number
+ */
+orderSchema.pre("save", async function (next) {
+  // Generate order number if new
+  if (this.isNew && !this.orderNumber) {
+    this.orderNumber = await generateOrderNumber();
+  }
+
+  // Calculate subtotal from items
+  if (this.items && this.items.length > 0) {
+    this.pricing.subtotal = this.items.reduce((sum, item) => {
+      item.subtotal = item.quantity * item.price;
+      return sum + item.subtotal;
+    }, 0);
+  }
+
+  // Calculate total
+  this.pricing.total =
+    this.pricing.subtotal +
+    (this.pricing.tax || 0) +
+    (this.pricing.shippingCharge || 0) -
+    (this.pricing.discount || 0);
+
+  // Add status history entry if status changed
+  if (this.isModified("status")) {
+    this.statusHistory.push({
+      status: this.status,
+      note: `Status changed to ${this.status}`,
+      timestamp: new Date(),
+    });
+  }
+
+  next();
+});
+
+/**
+ * Static method: Search orders with filters
+ */
+orderSchema.statics.searchOrders = async function (filters = {}) {
+  const query = {};
+
+  // Text search (order number, customer name, phone)
+  if (filters.search) {
+    const searchRegex = new RegExp(filters.search, "i");
+    query.$or = [
+      { orderNumber: searchRegex },
+      { "customer.name": searchRegex },
+      { "customer.phone": searchRegex },
+      { "customer.email": searchRegex },
+    ];
+  }
+
+  // Status filter
+  if (filters.status) {
+    query.status = filters.status;
+  }
+
+  // Payment status filter
+  if (filters.paymentStatus) {
+    query["payment.status"] = filters.paymentStatus;
+  }
+
+  // Payment method filter
+  if (filters.paymentMethod) {
+    query["payment.method"] = filters.paymentMethod;
+  }
+
+  // Source filter
+  if (filters.source) {
+    query.source = filters.source;
+  }
+
+  // Vendor filter
+  if (filters.vendorId) {
+    query.vendorId = filters.vendorId;
+  }
+
+  // Date range filter
+  if (filters.dateFrom || filters.dateTo) {
+    query.createdAt = {};
+    if (filters.dateFrom) {
+      query.createdAt.$gte = new Date(filters.dateFrom);
+    }
+    if (filters.dateTo) {
+      const toDate = new Date(filters.dateTo);
+      toDate.setHours(23, 59, 59, 999);
+      query.createdAt.$lte = toDate;
+    }
+  }
+
+  // Price range filter
+  if (filters.minTotal || filters.maxTotal) {
+    query["pricing.total"] = {};
+    if (filters.minTotal) {
+      query["pricing.total"].$gte = parseFloat(filters.minTotal);
+    }
+    if (filters.maxTotal) {
+      query["pricing.total"].$lte = parseFloat(filters.maxTotal);
+    }
+  }
+
+  // Pagination
+  const page = Math.max(1, filters.page || 1);
+  const limit = Math.min(100, Math.max(1, filters.limit || 20));
+  const skip = (page - 1) * limit;
+
+  // Sorting
+  const sortBy = filters.sortBy || "createdAt";
+  const order = filters.order === "asc" ? 1 : -1;
+  const sort = { [sortBy]: order };
+
+  // Execute query
+  const [results, total] = await Promise.all([
+    this.find(query)
+      .sort(sort)
+      .skip(skip)
+      .limit(limit)
+      .populate("createdBy", "name email")
+      .populate("vendorId", "businessName email")
+      .lean(),
+    this.countDocuments(query),
+  ]);
+
+  return {
+    results,
+    pagination: {
+      page,
+      limit,
+      total,
+      pages: Math.ceil(total / limit),
+    },
+  };
+};
+
+/**
+ * Static method: Get order statistics
+ */
+orderSchema.statics.getStats = async function (filters = {}) {
+  const matchStage = {};
+
+  // Date range filter
+  if (filters.dateFrom || filters.dateTo) {
+    matchStage.createdAt = {};
+    if (filters.dateFrom) {
+      matchStage.createdAt.$gte = new Date(filters.dateFrom);
+    }
+    if (filters.dateTo) {
+      const toDate = new Date(filters.dateTo);
+      toDate.setHours(23, 59, 59, 999);
+      matchStage.createdAt.$lte = toDate;
+    }
+  }
+
+  const stats = await this.aggregate([
+    ...(Object.keys(matchStage).length > 0 ? [{ $match: matchStage }] : []),
+    {
+      $group: {
+        _id: null,
+        totalOrders: { $sum: 1 },
+        totalRevenue: { $sum: "$pricing.total" },
+        averageOrderValue: { $avg: "$pricing.total" },
+        pendingOrders: {
+          $sum: { $cond: [{ $eq: ["$status", "pending"] }, 1, 0] },
+        },
+        confirmedOrders: {
+          $sum: { $cond: [{ $eq: ["$status", "confirmed"] }, 1, 0] },
+        },
+        processingOrders: {
+          $sum: { $cond: [{ $eq: ["$status", "processing"] }, 1, 0] },
+        },
+        shippedOrders: {
+          $sum: { $cond: [{ $eq: ["$status", "shipped"] }, 1, 0] },
+        },
+        deliveredOrders: {
+          $sum: { $cond: [{ $eq: ["$status", "delivered"] }, 1, 0] },
+        },
+        cancelledOrders: {
+          $sum: { $cond: [{ $eq: ["$status", "cancelled"] }, 1, 0] },
+        },
+        paidOrders: {
+          $sum: { $cond: [{ $eq: ["$payment.status", "paid"] }, 1, 0] },
+        },
+        pendingPayments: {
+          $sum: { $cond: [{ $eq: ["$payment.status", "pending"] }, 1, 0] },
+        },
+        totalPaidAmount: {
+          $sum: {
+            $cond: [
+              { $eq: ["$payment.status", "paid"] },
+              "$payment.paidAmount",
+              0,
+            ],
+          },
+        },
+      },
+    },
+  ]);
+
+  if (stats.length === 0) {
+    return {
+      totalOrders: 0,
+      totalRevenue: 0,
+      averageOrderValue: 0,
+      pendingOrders: 0,
+      confirmedOrders: 0,
+      processingOrders: 0,
+      shippedOrders: 0,
+      deliveredOrders: 0,
+      cancelledOrders: 0,
+      paidOrders: 0,
+      pendingPayments: 0,
+      totalPaidAmount: 0,
+    };
+  }
+
+  const result = stats[0];
+  delete result._id;
+  return result;
+};
+
+/**
+ * Instance method: Update order status with history
+ */
+orderSchema.methods.updateStatus = function (
+  newStatus,
+  note = "",
+  userId = null,
+) {
+  this.status = newStatus;
+  this.statusHistory.push({
+    status: newStatus,
+    note: note || `Status changed to ${newStatus}`,
+    updatedBy: userId,
+    timestamp: new Date(),
+  });
+
+  // Auto-update shipping dates
+  if (newStatus === "shipped" && !this.shipping.shippedAt) {
+    this.shipping.shippedAt = new Date();
+  }
+  if (newStatus === "delivered" && !this.shipping.deliveredAt) {
+    this.shipping.deliveredAt = new Date();
+  }
+
+  return this.save();
+};
+
+/**
+ * Instance method: Update payment status
+ */
+orderSchema.methods.updatePayment = function (
+  paymentStatus,
+  paidAmount = null,
+  transactionId = null,
+) {
+  this.payment.status = paymentStatus;
+
+  if (paymentStatus === "paid") {
+    this.payment.paidAt = new Date();
+    if (paidAmount !== null) {
+      this.payment.paidAmount = paidAmount;
+    } else {
+      this.payment.paidAmount = this.pricing.total;
+    }
+  }
+
+  if (transactionId) {
+    this.payment.transactionId = transactionId;
+  }
+
+  return this.save();
+};
+
+const Order = mongoose.model("Order", orderSchema);
+
+export default Order;

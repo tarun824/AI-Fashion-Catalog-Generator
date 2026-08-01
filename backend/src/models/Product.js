@@ -1,5 +1,6 @@
 import mongoose from "mongoose";
 import { nextSequence } from "./Counter.js";
+import { randomBytes } from "crypto";
 
 const { Schema } = mongoose;
 
@@ -328,6 +329,31 @@ const productSchema = new Schema(
       type: Number,
       default: 0,
     },
+
+    // Share count for analytics
+    shareCount: {
+      type: Number,
+      default: 0,
+    },
+
+    // Last shared date
+    lastSharedAt: {
+      type: Date,
+      default: null,
+    },
+
+    // Sales count for inventory intelligence
+    salesCount: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+
+    // Last sold date for inventory tracking
+    lastSoldAt: {
+      type: Date,
+      default: null,
+    },
   },
   {
     timestamps: true,
@@ -342,8 +368,16 @@ productSchema.index({ "categories.categoryId": 1, isPublished: 1 });
 productSchema.index({ slug: 1 });
 // Note: colors.names and colors.families indexes removed because they're already defined inline
 
-// Helper: Generate URL-friendly slug
-const generateSlug = (name, sku) => {
+// Helper: Generate short random code for slug uniqueness
+const generateRandomCode = (length = 6) => {
+  return randomBytes(Math.ceil(length / 2))
+    .toString("hex")
+    .slice(0, length)
+    .toLowerCase();
+};
+
+// Helper: Generate URL-friendly slug with random code for uniqueness
+const generateSlug = (name) => {
   const baseSlug = name
     .toLowerCase()
     .replace(/[^a-z0-9\s-]/g, "")
@@ -351,7 +385,8 @@ const generateSlug = (name, sku) => {
     .replace(/-+/g, "-")
     .trim();
 
-  return `${baseSlug}-${sku.toLowerCase()}`;
+  const randomCode = generateRandomCode(6);
+  return `${baseSlug}-${randomCode}`;
 };
 
 // Auto-generate SKU and slug before validation runs. Required fields
@@ -370,8 +405,8 @@ productSchema.pre("validate", async function (next) {
   }
 
   // Auto-generate slug if not provided
-  if (!this.slug && this.name && this.sku) {
-    this.slug = generateSlug(this.name, this.sku);
+  if (!this.slug && this.name) {
+    this.slug = generateSlug(this.name);
   }
 
   // Auto-generate variant SKUs for any variant missing one
