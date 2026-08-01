@@ -18,10 +18,12 @@ export default function SetupChecklist() {
   const loadSetupStatus = async () => {
     try {
       const response = await api.get("/admin/setup/status");
-      setSetupStatus(response.data.data);
+      // api.get() already returns parsed JSON, so response = { success, data }
+      const data = response.data;
+      setSetupStatus(data);
 
       // Auto-dismiss if fully complete
-      if (response.data.data.allComplete) {
+      if (data?.allComplete) {
         const dismissed = localStorage.getItem("setupChecklistDismissed");
         setDismissed(dismissed === "true");
       }

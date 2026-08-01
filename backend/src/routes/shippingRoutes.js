@@ -517,4 +517,18 @@ router.post("/webhook", async (req, res) => {
   }
 });
 
+/**
+ * GET /api/admin/shipping/pickup-locations
+ * Get list of configured pickup locations from Shiprocket
+ */
+router.get("/pickup-locations", async (req, res) => {
+  try {
+    const result = await shiprocketService.getPickupLocations();
+    res.json(result);
+  } catch (error) {
+    console.error("Error fetching pickup locations:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 export default router;

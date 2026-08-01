@@ -6,34 +6,34 @@
 import { useState } from "react";
 import { Zap, Loader, Check } from "lucide-react";
 import { api } from "../utils/api";
+import ShippingConfirmModal from "./ShippingConfirmModal";
 
 export default function OneClickShip({
   order,
   onSuccess,
   variant = "primary",
+  disabled = false,
 }) {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [showModal, setShowModal] = useState(false);
 
   const handleOneClickShip = async () => {
-    if (
-      !confirm(
-        "Ship this order automatically? We'll select the best courier for you.",
-      )
-    ) {
-      return;
-    }
+    if (disabled) return;
+    setShowModal(true);
+  };
 
+  const confirmShip = async (pickupLocation) => {
     setLoading(true);
     try {
       const response = await api.post("/admin/shipping/one-click-ship", {
         orderId: order._id,
-        pickupLocation: "Primary",
+        pickupLocation: pickupLocation, // Use selected pickup location from modal
       });
 
       setSuccess(true);
       setTimeout(() => {
-        onSuccess && onSuccess(response.data.data);
+        onSuccess && onSuccess(response.data);
       }, 1500);
     } catch (error) {
       alert(error.response?.data?.error || "Failed to ship order");
@@ -62,27 +62,37 @@ export default function OneClickShip({
   };
 
   return (
-    <button
-      onClick={handleOneClickShip}
-      disabled={loading}
-      className={`
-        px-6 py-3 rounded-lg font-semibold transition
-        disabled:opacity-50 disabled:cursor-not-allowed
-        flex items-center gap-2 shadow-lg hover:shadow-xl
-        ${variants[variant]}
-      `}
-    >
-      {loading ? (
-        <>
-          <Loader className="w-5 h-5 animate-spin" />
-          Shipping...
-        </>
-      ) : (
-        <>
-          <Zap className="w-5 h-5" />
-          One-Click Ship
-        </>
-      )}
-    </button>
+    <>
+      <ShippingConfirmModal
+        isOpen={showModal}
+        onClose={() => setShowModal(false)}
+        onConfirm={confirmShip}
+        order={order}
+        mode="oneclick"
+      />
+
+      <button
+        onClick={handleOneClickShip}
+        disabled={loading || disabled}
+        className={`
+          px-6 py-3 rounded-lg font-semibold transition
+          disabled:opacity-50 disabled:cursor-not-allowed
+          flex items-center gap-2 shadow-lg hover:shadow-xl
+          ${variants[variant]}
+        `}
+      >
+        {loading ? (
+          <>
+            <Loader className="w-5 h-5 animate-spin" />
+            Shipping...
+          </>
+        ) : (
+          <>
+            <Zap className="w-5 h-5" />
+            One-Click Ship
+          </>
+        )}
+      </button>
+    </>
   );
 }

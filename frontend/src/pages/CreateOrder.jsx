@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { api } from "../utils/api";
+import CustomerSelector from "../components/CustomerSelector";
 
 export default function CreateOrder() {
   const navigate = useNavigate();
@@ -8,6 +9,7 @@ export default function CreateOrder() {
   const [products, setProducts] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [searchResults, setSearchResults] = useState([]);
+  const [selectedCustomer, setSelectedCustomer] = useState(null);
 
   // Form State
   const [customer, setCustomer] = useState({
@@ -44,6 +46,43 @@ export default function CreateOrder() {
   const [source, setSource] = useState("manual");
   const [notes, setNotes] = useState("");
   const [internalNotes, setInternalNotes] = useState("");
+
+  // Handle customer selection from dropdown
+  const handleCustomerSelect = (selectedCust) => {
+    setSelectedCustomer(selectedCust);
+
+    if (selectedCust) {
+      // Auto-fill customer form with selected customer data
+      setCustomer({
+        name: selectedCust.name || "",
+        phone: selectedCust.phone || "",
+        email: selectedCust.email || "",
+        address: {
+          line1: selectedCust.address?.line1 || "",
+          line2: selectedCust.address?.line2 || "",
+          city: selectedCust.address?.city || "",
+          state: selectedCust.address?.state || "",
+          pincode: selectedCust.address?.pincode || "",
+          country: selectedCust.address?.country || "India",
+        },
+      });
+    } else {
+      // Reset to empty form for new customer
+      setCustomer({
+        name: "",
+        phone: "",
+        email: "",
+        address: {
+          line1: "",
+          line2: "",
+          city: "",
+          state: "",
+          pincode: "",
+          country: "India",
+        },
+      });
+    }
+  };
 
   // Search products
   const searchProducts = async (query) => {
@@ -178,7 +217,7 @@ export default function CreateOrder() {
       };
 
       const response = await api.post("/admin/orders", orderData);
-      navigate(`/dashboard/orders/${response.data._id}`);
+      navigate(`/admin/orders/${response.data._id}`);
     } catch (err) {
       alert("Failed to create order: " + err.message);
     } finally {
@@ -191,7 +230,7 @@ export default function CreateOrder() {
       {/* Header */}
       <div>
         <Link
-          to="/dashboard/orders"
+          to="/admin/orders"
           className="text-sm text-blue-600 hover:text-blue-800 mb-2 inline-block"
         >
           ← Back to Orders
@@ -204,147 +243,167 @@ export default function CreateOrder() {
 
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* Customer Information */}
-        <div className="bg-white p-6 rounded-lg shadow border border-gray-200">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">
+        <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow border border-gray-200 dark:border-gray-700">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
             Customer Information
           </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Name *
-              </label>
-              <input
-                type="text"
-                value={customer.name}
-                onChange={(e) =>
-                  setCustomer({ ...customer, name: e.target.value })
-                }
-                required
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Phone *
-              </label>
-              <input
-                type="tel"
-                value={customer.phone}
-                onChange={(e) =>
-                  setCustomer({ ...customer, phone: e.target.value })
-                }
-                required
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-            <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Email
-              </label>
-              <input
-                type="email"
-                value={customer.email}
-                onChange={(e) =>
-                  setCustomer({ ...customer, email: e.target.value })
-                }
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-            <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Address Line 1
-              </label>
-              <input
-                type="text"
-                value={customer.address.line1}
-                onChange={(e) =>
-                  setCustomer({
-                    ...customer,
-                    address: { ...customer.address, line1: e.target.value },
-                  })
-                }
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-            <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Address Line 2
-              </label>
-              <input
-                type="text"
-                value={customer.address.line2}
-                onChange={(e) =>
-                  setCustomer({
-                    ...customer,
-                    address: { ...customer.address, line2: e.target.value },
-                  })
-                }
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                City
-              </label>
-              <input
-                type="text"
-                value={customer.address.city}
-                onChange={(e) =>
-                  setCustomer({
-                    ...customer,
-                    address: { ...customer.address, city: e.target.value },
-                  })
-                }
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                State
-              </label>
-              <input
-                type="text"
-                value={customer.address.state}
-                onChange={(e) =>
-                  setCustomer({
-                    ...customer,
-                    address: { ...customer.address, state: e.target.value },
-                  })
-                }
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Pincode
-              </label>
-              <input
-                type="text"
-                value={customer.address.pincode}
-                onChange={(e) =>
-                  setCustomer({
-                    ...customer,
-                    address: { ...customer.address, pincode: e.target.value },
-                  })
-                }
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Country
-              </label>
-              <input
-                type="text"
-                value={customer.address.country}
-                onChange={(e) =>
-                  setCustomer({
-                    ...customer,
-                    address: { ...customer.address, country: e.target.value },
-                  })
-                }
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-              />
+
+          {/* Customer Selector */}
+          <div className="mb-6">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Select Customer
+            </label>
+            <CustomerSelector
+              onSelect={handleCustomerSelect}
+              selectedCustomer={selectedCustomer}
+            />
+          </div>
+
+          {/* Customer Form Fields */}
+          <div className="border-t border-gray-200 dark:border-gray-700 pt-6">
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+              {selectedCustomer
+                ? "Review and edit customer details if needed:"
+                : "Enter new customer details:"}
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Name *
+                </label>
+                <input
+                  type="text"
+                  value={customer.name}
+                  onChange={(e) =>
+                    setCustomer({ ...customer, name: e.target.value })
+                  }
+                  required
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Phone *
+                </label>
+                <input
+                  type="tel"
+                  value={customer.phone}
+                  onChange={(e) =>
+                    setCustomer({ ...customer, phone: e.target.value })
+                  }
+                  required
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Email
+                </label>
+                <input
+                  type="email"
+                  value={customer.email}
+                  onChange={(e) =>
+                    setCustomer({ ...customer, email: e.target.value })
+                  }
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Address Line 1
+                </label>
+                <input
+                  type="text"
+                  value={customer.address.line1}
+                  onChange={(e) =>
+                    setCustomer({
+                      ...customer,
+                      address: { ...customer.address, line1: e.target.value },
+                    })
+                  }
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Address Line 2
+                </label>
+                <input
+                  type="text"
+                  value={customer.address.line2}
+                  onChange={(e) =>
+                    setCustomer({
+                      ...customer,
+                      address: { ...customer.address, line2: e.target.value },
+                    })
+                  }
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  City
+                </label>
+                <input
+                  type="text"
+                  value={customer.address.city}
+                  onChange={(e) =>
+                    setCustomer({
+                      ...customer,
+                      address: { ...customer.address, city: e.target.value },
+                    })
+                  }
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  State
+                </label>
+                <input
+                  type="text"
+                  value={customer.address.state}
+                  onChange={(e) =>
+                    setCustomer({
+                      ...customer,
+                      address: { ...customer.address, state: e.target.value },
+                    })
+                  }
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Pincode
+                </label>
+                <input
+                  type="text"
+                  value={customer.address.pincode}
+                  onChange={(e) =>
+                    setCustomer({
+                      ...customer,
+                      address: { ...customer.address, pincode: e.target.value },
+                    })
+                  }
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Country
+                </label>
+                <input
+                  type="text"
+                  value={customer.address.country}
+                  onChange={(e) =>
+                    setCustomer({
+                      ...customer,
+                      address: { ...customer.address, country: e.target.value },
+                    })
+                  }
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
             </div>
           </div>
         </div>
@@ -639,7 +698,7 @@ export default function CreateOrder() {
         {/* Submit Button */}
         <div className="flex justify-end gap-3">
           <Link
-            to="/dashboard/orders"
+            to="/admin/orders"
             className="px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition"
           >
             Cancel

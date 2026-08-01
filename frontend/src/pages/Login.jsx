@@ -51,7 +51,6 @@ export default function Login() {
                 onChange={(e) => setEmail(e.target.value)}
                 required
                 className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                placeholder="admin@example.com"
               />
             </div>
 
@@ -87,13 +86,6 @@ export default function Login() {
               {loading ? "Signing in..." : "Sign In"}
             </button>
           </form>
-
-          <div className="mt-6 text-center text-sm text-gray-600 dark:text-gray-400">
-            <p>Default credentials:</p>
-            <p className="font-mono text-xs mt-1">
-              admin@example.com / admin123
-            </p>
-          </div>
         </div>
       </div>
     </div>

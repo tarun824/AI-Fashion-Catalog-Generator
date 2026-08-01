@@ -11,6 +11,7 @@
  */
 
 import shiprocketService from "./shiprocketService.js";
+import Integration from "../models/Integration.js";
 
 class IntegrationService {
   /**
@@ -162,6 +163,36 @@ class IntegrationService {
     }
 
     try {
+      // Check database first
+      const integration = await Integration.findOne({ name: "shiprocket" });
+
+      if (integration) {
+        const isTokenValid = integration.isTokenValid();
+
+        return {
+          connected: integration.status === "active" && isTokenValid,
+          message: isTokenValid
+            ? "Connected successfully"
+            : "Token expired, will refresh on next use",
+          lastChecked: new Date().toISOString(),
+          stats: {
+            totalRequests: integration.stats.totalRequests,
+            successRate:
+              integration.stats.totalRequests > 0
+                ? (
+                    (integration.stats.successfulRequests /
+                      integration.stats.totalRequests) *
+                    100
+                  ).toFixed(1) + "%"
+                : "N/A",
+            lastRequestAt: integration.stats.lastRequestAt,
+          },
+          tokenExpiry: integration.token.expiresAt,
+          customData: integration.data, // Shiprocket-specific dynamic fields
+        };
+      }
+
+      // No database record, try to authenticate
       await shiprocketService.getAuthToken();
       return {
         connected: true,
@@ -180,10 +211,25 @@ class IntegrationService {
   async testShiprocket() {
     try {
       const token = await shiprocketService.getAuthToken();
+
+      // Get stats from database
+      const integration = await Integration.findOne({ name: "shiprocket" });
+
       return {
         success: true,
         message: "Shiprocket connection successful",
-        data: { token: token.substring(0, 20) + "..." },
+        data: {
+          token: token.substring(0, 20) + "...",
+          hasToken: !!token,
+          tokenValid: integration?.isTokenValid() || false,
+          stats: integration
+            ? {
+                totalRequests: integration.stats.totalRequests,
+                successfulRequests: integration.stats.successfulRequests,
+                failedRequests: integration.stats.failedRequests,
+              }
+            : null,
+        },
       };
     } catch (error) {
       return {

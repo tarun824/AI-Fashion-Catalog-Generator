@@ -10,7 +10,8 @@ const VIP_SPENT_THRESHOLD = parseInt(process.env.VIP_SPENT_THRESHOLD) || 50000; 
 const VIP_ORDERS_THRESHOLD = parseInt(process.env.VIP_ORDERS_THRESHOLD) || 10;
 
 // Regular Customer Thresholds
-const REGULAR_ORDERS_THRESHOLD = parseInt(process.env.REGULAR_ORDERS_THRESHOLD) || 3;
+const REGULAR_ORDERS_THRESHOLD =
+  parseInt(process.env.REGULAR_ORDERS_THRESHOLD) || 3;
 
 // Inactive Threshold
 const INACTIVE_DAYS = parseInt(process.env.INACTIVE_DAYS) || 90;

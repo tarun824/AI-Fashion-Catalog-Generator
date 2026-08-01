@@ -4,13 +4,17 @@ import "../styles/PublicFooter.css";
 
 const PublicFooter = () => {
   // Environment variables for branding and contact info
-  const storeName = import.meta.env.VITE_STORE_NAME || 'SAREE HERITAGE';
-  const supportEmail = import.meta.env.VITE_SUPPORT_EMAIL || 'support@yourstore.com';
-  const whatsappPhone = import.meta.env.VITE_WHATSAPP_PHONE || '919876543210';
-  const facebookUrl = import.meta.env.VITE_FACEBOOK_URL || 'https://facebook.com';
-  const instagramUrl = import.meta.env.VITE_INSTAGRAM_URL || 'https://instagram.com';
-  const twitterUrl = import.meta.env.VITE_TWITTER_URL || 'https://twitter.com';
-  const pinterestUrl = import.meta.env.VITE_PINTEREST_URL || 'https://pinterest.com';
+  const storeName = import.meta.env.VITE_STORE_NAME || "SAREE HERITAGE";
+  const supportEmail =
+    import.meta.env.VITE_SUPPORT_EMAIL || "support@yourstore.com";
+  const whatsappPhone = import.meta.env.VITE_WHATSAPP_PHONE || "919876543210";
+  const facebookUrl =
+    import.meta.env.VITE_FACEBOOK_URL || "https://facebook.com";
+  const instagramUrl =
+    import.meta.env.VITE_INSTAGRAM_URL || "https://instagram.com";
+  const twitterUrl = import.meta.env.VITE_TWITTER_URL || "https://twitter.com";
+  const pinterestUrl =
+    import.meta.env.VITE_PINTEREST_URL || "https://pinterest.com";
 
   return (
     <footer className="public-footer">

@@ -179,7 +179,7 @@ export default function Orders() {
           </p>
         </div>
         <Link
-          to="/dashboard/orders/create"
+          to="/admin/orders/create"
           className="px-4 py-2 bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 text-white rounded-lg transition"
         >
           + Create Order
@@ -450,7 +450,7 @@ export default function Orders() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <Link
-                          to={`/dashboard/orders/${order._id}`}
+                          to={`/admin/orders/${order._id}`}
                           className="text-blue-600 hover:text-blue-900 font-medium"
                         >
                           {order.orderNumber}
@@ -487,11 +487,24 @@ export default function Orders() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm">
                         <Link
-                          to={`/dashboard/orders/${order._id}`}
+                          to={`/admin/orders/${order._id}`}
                           className="text-blue-600 hover:text-blue-900 mr-3"
                         >
                           View
                         </Link>
+                        {!order.shipping?.awbCode &&
+                          order.status !== "cancelled" &&
+                          order.status !== "delivered" && (
+                            <Link
+                              to={`/admin/orders/${order._id}?action=ship`}
+                              className="text-green-600 hover:text-green-900 font-medium"
+                            >
+                              🚀 Ship
+                            </Link>
+                          )}
+                        {order.shipping?.awbCode && (
+                          <span className="text-gray-400">✓ Shipped</span>
+                        )}
                       </td>
                     </tr>
                   ))}

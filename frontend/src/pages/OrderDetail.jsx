@@ -1,16 +1,23 @@
 import { useState, useEffect } from "react";
-import { useParams, Link, useNavigate } from "react-router-dom";
+import {
+  useParams,
+  Link,
+  useNavigate,
+  useSearchParams,
+} from "react-router-dom";
 import { api } from "../utils/api";
 import OrderStatusBadge from "../components/OrderStatusBadge";
 import ShippingWizard from "../components/ShippingWizard";
 import ShippingTracking from "../components/ShippingTracking";
+import ShippingConfirmModal from "../components/ShippingConfirmModal";
 import OneClickShip from "../components/OneClickShip";
 import { format } from "date-fns";
-import { Truck, Package } from "lucide-react";
+import { Truck, Package, AlertCircle } from "lucide-react";
 
 export default function OrderDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [order, setOrder] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -18,6 +25,8 @@ export default function OrderDetail() {
 
   // Shipping wizard
   const [showShippingWizard, setShowShippingWizard] = useState(false);
+  const [showShippingConfirm, setShowShippingConfirm] = useState(false);
+  const [selectedPickupLocation, setSelectedPickupLocation] = useState("");
   const [trackingRefresh, setTrackingRefresh] = useState(0);
 
   // Update modals
@@ -32,6 +41,27 @@ export default function OrderDetail() {
   useEffect(() => {
     loadOrder();
   }, [id]);
+
+  useEffect(() => {
+    // Auto-scroll and highlight shipping section if ?action=ship in URL
+    if (searchParams.get("action") === "ship" && order) {
+      setTimeout(() => {
+        const section = document.getElementById("shipping-section");
+        if (section) {
+          section.scrollIntoView({ behavior: "smooth", block: "center" });
+          // Add flash animation to draw attention
+          section.classList.add("ring-4", "ring-blue-400", "ring-offset-4");
+          setTimeout(() => {
+            section.classList.remove(
+              "ring-4",
+              "ring-blue-400",
+              "ring-offset-4",
+            );
+          }, 2500);
+        }
+      }, 600);
+    }
+  }, [searchParams, order]);
 
   const loadOrder = async () => {
     setLoading(true);
@@ -94,7 +124,7 @@ export default function OrderDetail() {
 
     try {
       await api.delete(`/admin/orders/${id}`);
-      navigate("/dashboard/orders");
+      navigate("/admin/orders");
     } catch (err) {
       alert("Failed to cancel order: " + err.message);
     }
@@ -121,7 +151,7 @@ export default function OrderDetail() {
       <div className="text-center py-12">
         <p className="text-red-600">{error || "Order not found"}</p>
         <Link
-          to="/dashboard/orders"
+          to="/admin/orders"
           className="text-blue-600 hover:text-blue-800 mt-4 inline-block"
         >
           ← Back to Orders
@@ -136,7 +166,7 @@ export default function OrderDetail() {
       <div className="flex items-center justify-between">
         <div>
           <Link
-            to="/dashboard/orders"
+            to="/admin/orders"
             className="text-sm text-blue-600 hover:text-blue-800 mb-2 inline-block"
           >
             ← Back to Orders
@@ -166,6 +196,43 @@ export default function OrderDetail() {
           )}
         </div>
       </div>
+
+      {/* Shipping Action Banner */}
+      {searchParams.get("action") === "ship" && !order.shipping?.awbCode && (
+        <div className="bg-gradient-to-r from-blue-600 to-purple-600 text-white p-6 rounded-xl shadow-lg border-2 border-blue-400">
+          <div className="flex items-center gap-4">
+            <div className="p-3 bg-white/20 rounded-lg backdrop-blur-sm">
+              <Truck className="w-8 h-8" />
+            </div>
+            <div className="flex-1">
+              <h3 className="text-xl font-bold mb-1">
+                Ready to Ship This Order?
+              </h3>
+              {order.status === "pending" ? (
+                <p className="text-blue-100">
+                  👇 Scroll down to the <strong>Shipping section</strong> and
+                  click <strong>"✓ Confirm Order Now"</strong> first, then ship.
+                </p>
+              ) : (
+                <p className="text-blue-100">
+                  👇 Scroll down to the <strong>Shipping section</strong> below
+                  to start shipping!
+                </p>
+              )}
+            </div>
+            <button
+              onClick={() => {
+                document
+                  .getElementById("shipping-section")
+                  ?.scrollIntoView({ behavior: "smooth", block: "center" });
+              }}
+              className="px-6 py-3 bg-white text-blue-600 font-semibold rounded-lg hover:bg-blue-50 transition shadow-lg"
+            >
+              Go to Shipping →
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Status and Payment Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -236,11 +303,12 @@ export default function OrderDetail() {
         </div>
       </div>
 
-      {/* Shipping Section */}
-      {(order.status === "confirmed" ||
-        order.status === "processing" ||
-        order.status === "shipped") && (
-        <div className="bg-gradient-to-br from-blue-50 to-purple-50 p-6 rounded-xl border border-blue-200">
+      {/* Shipping Section - Always visible for non-cancelled/non-delivered orders */}
+      {order.status !== "cancelled" && order.status !== "delivered" && (
+        <div
+          id="shipping-section"
+          className="bg-gradient-to-br from-blue-50 to-purple-50 p-6 rounded-xl border border-blue-200"
+        >
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-3">
               <div className="p-3 bg-white rounded-lg shadow-sm">
@@ -258,16 +326,24 @@ export default function OrderDetail() {
 
             {!order.shipping?.awbCode && (
               <div className="flex gap-3">
+                {order.status === "pending" && (
+                  <div className="flex items-center gap-2 px-4 py-2 bg-yellow-50 border border-yellow-200 rounded-lg text-sm text-yellow-700">
+                    <AlertCircle className="w-4 h-4" />
+                    <span>Confirm order first to ship</span>
+                  </div>
+                )}
                 <OneClickShip
                   order={order}
                   onSuccess={() => {
                     loadOrder();
                     setTrackingRefresh((prev) => prev + 1);
                   }}
+                  disabled={order.status === "pending"}
                 />
                 <button
-                  onClick={() => setShowShippingWizard(true)}
-                  className="px-6 py-3 bg-white border-2 border-blue-600 text-blue-600 rounded-lg font-semibold hover:bg-blue-50 transition flex items-center gap-2"
+                  onClick={() => setShowShippingConfirm(true)}
+                  disabled={order.status === "pending"}
+                  className="px-6 py-3 bg-white border-2 border-blue-600 text-blue-600 rounded-lg font-semibold hover:bg-blue-50 transition flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <Package className="w-5 h-5" />
                   Ship with Options
@@ -281,14 +357,50 @@ export default function OrderDetail() {
           ) : (
             <div className="bg-white rounded-lg p-6 text-center border border-gray-200">
               <Package className="w-16 h-16 text-gray-300 mx-auto mb-3" />
-              <p className="text-gray-600 mb-4">
-                Order confirmed and ready to ship
-              </p>
-              <p className="text-sm text-gray-500">
-                Use "One-Click Ship" for automatic courier selection or
-                <br />
-                "Ship with Options" to manually choose courier and customize
-              </p>
+              {order.status === "pending" ? (
+                <>
+                  <p className="text-gray-900 font-semibold mb-2">
+                    Order needs to be confirmed before shipping
+                  </p>
+                  <p className="text-sm text-gray-500 mb-4">
+                    Update order status to "Confirmed" in the Order Status
+                    section above
+                  </p>
+                  <button
+                    onClick={async () => {
+                      if (confirm("Confirm this order now?")) {
+                        try {
+                          setUpdating(true);
+                          await api.patch(`/admin/orders/${id}/status`, {
+                            status: "confirmed",
+                            note: "Confirmed for shipping",
+                          });
+                          await loadOrder();
+                        } catch (err) {
+                          alert("Failed to confirm: " + err.message);
+                        } finally {
+                          setUpdating(false);
+                        }
+                      }
+                    }}
+                    disabled={updating}
+                    className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition disabled:opacity-50"
+                  >
+                    {updating ? "Confirming..." : "✓ Confirm Order Now"}
+                  </button>
+                </>
+              ) : (
+                <>
+                  <p className="text-gray-600 mb-4">
+                    Order confirmed and ready to ship
+                  </p>
+                  <p className="text-sm text-gray-500">
+                    Use "One-Click Ship" for automatic courier selection or
+                    <br />
+                    "Ship with Options" to manually choose courier and customize
+                  </p>
+                </>
+              )}
             </div>
           )}
         </div>
@@ -660,10 +772,26 @@ export default function OrderDetail() {
         </div>
       )}
 
+      {/* Shipping Confirmation Modal */}
+      {showShippingConfirm && (
+        <ShippingConfirmModal
+          isOpen={showShippingConfirm}
+          onClose={() => setShowShippingConfirm(false)}
+          onConfirm={(pickupLocation) => {
+            setShowShippingConfirm(false);
+            setSelectedPickupLocation(pickupLocation);
+            setShowShippingWizard(true);
+          }}
+          order={order}
+          mode="options"
+        />
+      )}
+
       {/* Shipping Wizard Modal */}
       {showShippingWizard && (
         <ShippingWizard
           order={order}
+          pickupLocation={selectedPickupLocation}
           onClose={() => setShowShippingWizard(false)}
           onSuccess={() => {
             setShowShippingWizard(false);

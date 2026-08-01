@@ -23,7 +23,12 @@ import {
 } from "lucide-react";
 import { api } from "../utils/api";
 
-export default function ShippingWizard({ order, onClose, onSuccess }) {
+export default function ShippingWizard({
+  order,
+  pickupLocation = "Primary",
+  onClose,
+  onSuccess,
+}) {
   const [currentStep, setCurrentStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -74,17 +79,20 @@ export default function ShippingWizard({ order, onClose, onSuccess }) {
     try {
       const response = await api.post("/admin/shipping/create-order", {
         orderId: order._id,
-        pickupLocation: "Primary",
+        pickupLocation: pickupLocation, // Use prop instead of hardcoded
       });
 
       setShippingData((prev) => ({
         ...prev,
-        shiprocketOrderId: response.data.data.shiprocketOrderId,
-        shipmentId: response.data.data.shipmentId,
+        shiprocketOrderId:
+          response.shiprocketOrderId || response.data?.shiprocketOrderId,
+        shipmentId: response.shipmentId || response.data?.shipmentId,
       }));
 
       // Auto-fetch courier rates
-      await fetchCourierRates(response.data.data.shiprocketOrderId);
+      await fetchCourierRates(
+        response.shiprocketOrderId || response.data?.shiprocketOrderId,
+      );
       setCurrentStep(2);
     } catch (error) {
       setError(error.response?.data?.error || "Failed to create order");
@@ -101,13 +109,18 @@ export default function ShippingWizard({ order, onClose, onSuccess }) {
       const response = await api.get(
         `/admin/shipping/courier-rates/${order._id}`,
       );
+
+      // Handle response structure - api returns parsed JSON directly
+      const couriers = response.couriers || [];
+
       setShippingData((prev) => ({
         ...prev,
-        couriers: response.data.couriers,
-        selectedCourier: response.data.couriers[0], // Auto-select cheapest
+        couriers: couriers,
+        selectedCourier: couriers.length > 0 ? couriers[0] : null, // Auto-select cheapest if available
       }));
     } catch (error) {
       setError("Failed to fetch courier rates");
+      console.error("Courier rates error:", error);
     }
   };
 
@@ -125,7 +138,7 @@ export default function ShippingWizard({ order, onClose, onSuccess }) {
 
       setShippingData((prev) => ({
         ...prev,
-        awbCode: response.data.data.awbCode,
+        awbCode: response.awbCode || response.data?.awbCode,
       }));
 
       setCurrentStep(3);
@@ -149,7 +162,7 @@ export default function ShippingWizard({ order, onClose, onSuccess }) {
 
       setShippingData((prev) => ({
         ...prev,
-        labelUrl: response.data.data.labelUrl,
+        labelUrl: response.labelUrl || response.data?.labelUrl,
       }));
 
       setCurrentStep(4);
@@ -174,7 +187,8 @@ export default function ShippingWizard({ order, onClose, onSuccess }) {
 
       setShippingData((prev) => ({
         ...prev,
-        pickupDate: response.data.data.pickupScheduledDate,
+        pickupDate:
+          response.pickupScheduledDate || response.data?.pickupScheduledDate,
       }));
 
       // Success!

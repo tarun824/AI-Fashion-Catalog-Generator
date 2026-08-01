@@ -23,8 +23,8 @@ export default function DashboardOverview() {
   const loadDashboardData = async () => {
     try {
       const response = await api.get("/admin/analytics/dashboard");
-      if (response.data.success) {
-        setDashboardData(response.data.data);
+      if (response.success) {
+        setDashboardData(response.data);
       }
     } catch (err) {
       setError(err.message || "Failed to load dashboard data");

@@ -617,9 +617,9 @@ router.get("/filters", async (req, res) => {
       occasions: occasions.filter(Boolean).sort(),
       workTypes: workTypes.filter(Boolean).sort(),
       colors: colors.filter(Boolean).sort(),
-      priceRange: priceStats[0] || { 
-        min: 0, 
-        max: parseInt(process.env.DEFAULT_MAX_PRICE) || 50000 
+      priceRange: priceStats[0] || {
+        min: 0,
+        max: parseInt(process.env.DEFAULT_MAX_PRICE) || 50000,
       },
     });
   } catch (error) {

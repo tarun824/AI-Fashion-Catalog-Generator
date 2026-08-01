@@ -3,7 +3,7 @@
  * Complete shipping automation with all API endpoints
  *
  * Features:
- * - Authentication & token management
+ * - Authentication & token management (database-backed)
  * - Order creation & management
  * - Courier rate comparison
  * - Label generation
@@ -13,6 +13,10 @@
  */
 
 import axios from "axios";
+import dotenv from "dotenv";
+import Integration from "../models/Integration.js";
+
+dotenv.config();
 
 class ShiprocketService {
   constructor() {
@@ -21,37 +25,104 @@ class ShiprocketService {
       "https://apiv2.shiprocket.in/v1/external";
     this.email = process.env.SHIPROCKET_EMAIL;
     this.password = process.env.SHIPROCKET_PASSWORD;
-    this.token = null;
-    this.tokenExpiry = null;
+
+    // In-memory cache for performance (survives during runtime)
+    this.memoryToken = null;
+    this.memoryExpiry = null;
   }
 
   /**
-   * Get authentication token (auto-refreshes if expired)
+   * Get authentication token (checks database → memory → new login)
    */
   async getAuthToken() {
-    // Check if we have a valid token
-    if (this.token && this.tokenExpiry && Date.now() < this.tokenExpiry) {
-      return this.token;
+    // STEP 1: Check in-memory cache (fastest - no DB query)
+    if (
+      this.memoryToken &&
+      this.memoryExpiry &&
+      Date.now() < this.memoryExpiry
+    ) {
+      return this.memoryToken;
     }
 
+    // STEP 2: Check database (survives server restarts)
+    try {
+      const integration = await Integration.findOne({ name: "shiprocket" });
+
+      if (integration && integration.isTokenValid()) {
+        // Load token from database into memory
+        this.memoryToken = integration.token.value;
+        this.memoryExpiry = new Date(integration.token.expiresAt).getTime();
+
+        console.log("✓ Shiprocket token loaded from database");
+        return this.memoryToken;
+      }
+    } catch (dbError) {
+      console.warn("Database token check failed:", dbError.message);
+      // Continue to login if database fails
+    }
+
+    // STEP 3: Login and get new token
     try {
       const response = await axios.post(`${this.baseURL}/auth/login`, {
         email: this.email,
         password: this.password,
       });
 
-      this.token = response.data.token;
-      // Token expires in 10 days, refresh after 9 days
-      this.tokenExpiry = Date.now() + 9 * 24 * 60 * 60 * 1000;
+      const newToken = response.data.token;
+      const expiresInMs = 9 * 24 * 60 * 60 * 1000; // 9 days
+
+      // Save to memory cache
+      this.memoryToken = newToken;
+      this.memoryExpiry = Date.now() + expiresInMs;
+
+      // Save to database (async, don't block)
+      this.saveTokenToDatabase(newToken, expiresInMs).catch((err) => {
+        console.warn("Failed to save token to database:", err.message);
+      });
 
       console.log("✓ Shiprocket authenticated successfully");
-      return this.token;
+      return newToken;
     } catch (error) {
       console.error(
         "Shiprocket authentication failed:",
         error.response?.data || error.message,
       );
       throw new Error("Failed to authenticate with Shiprocket");
+    }
+  }
+
+  /**
+   * Save authentication token to database
+   */
+  async saveTokenToDatabase(tokenValue, expiresInMs) {
+    try {
+      let integration = await Integration.findOne({ name: "shiprocket" });
+
+      if (!integration) {
+        // Create new integration record
+        integration = await Integration.create({
+          name: "shiprocket",
+          displayName: "Shiprocket",
+          category: "shipping",
+          credentials: {
+            email: this.email,
+            password: "***", // Don't store plain password
+          },
+          status: "active",
+        });
+      }
+
+      // Save token
+      await integration.saveToken(tokenValue, expiresInMs);
+
+      // Store Shiprocket-specific data in dynamic field
+      await integration.updateData("lastAuthAt", new Date());
+      await integration.updateData("apiBase", this.baseURL);
+
+      console.log("✓ Token saved to database");
+    } catch (error) {
+      console.error("Failed to save token to database:", error.message);
+      throw error;
     }
   }
 
@@ -75,14 +146,131 @@ class ShiprocketService {
         config.data = data;
       }
 
+      // ========== DETAILED REQUEST LOGGING ==========
+      console.log("\n" + "=".repeat(80));
+      console.log(`🚀 SHIPROCKET API REQUEST`);
+      console.log("=".repeat(80));
+      console.log(`Method:   ${method}`);
+      console.log(`Endpoint: ${endpoint}`);
+      console.log(`Full URL: ${config.url}`);
+      if (data) {
+        console.log("\n📦 Request Payload:");
+        console.log(JSON.stringify(data, null, 2));
+      }
+      console.log("=".repeat(80) + "\n");
+
       const response = await axios(config);
+
+      // ========== DETAILED RESPONSE LOGGING ==========
+      console.log("\n" + "=".repeat(80));
+      console.log(`✅ SHIPROCKET API RESPONSE`);
+      console.log("=".repeat(80));
+      console.log(`Status:   ${response.status} ${response.statusText}`);
+      console.log(`Endpoint: ${endpoint}`);
+      console.log("\n📨 Response Data:");
+      console.log(JSON.stringify(response.data, null, 2));
+      console.log("=".repeat(80) + "\n");
+
+      // Record successful request (async, don't block)
+      this.recordApiSuccess().catch((err) => {
+        console.warn("Failed to record API success:", err.message);
+      });
+
       return response.data;
     } catch (error) {
-      console.error(
-        `Shiprocket API Error [${method} ${endpoint}]:`,
-        error.response?.data || error.message,
-      );
+      // ========== DETAILED ERROR LOGGING ==========
+      console.log("\n" + "=".repeat(80));
+      console.log(`❌ SHIPROCKET API ERROR`);
+      console.log("=".repeat(80));
+      console.log(`Method:   ${method}`);
+      console.log(`Endpoint: ${endpoint}`);
+
+      if (error.response) {
+        // Request made, server responded with error status
+        console.log(
+          `Status:   ${error.response.status} ${error.response.statusText}`,
+        );
+        console.log("\n🔴 Error Response:");
+        console.log(JSON.stringify(error.response.data, null, 2));
+      } else if (error.request) {
+        // Request made but no response received
+        console.log(`Error:    No response received`);
+        console.log(error.message);
+      } else {
+        // Something else happened
+        console.log(`Error:    ${error.message}`);
+      }
+      console.log("=".repeat(80) + "\n");
+
+      // Record failed request (async, don't block)
+      this.recordApiFailure(error.message).catch((err) => {
+        console.warn("Failed to record API failure:", err.message);
+      });
+
       throw error;
+    }
+  }
+
+  /**
+   * Record successful API request in database
+   */
+  async recordApiSuccess() {
+    try {
+      const integration = await Integration.findOne({ name: "shiprocket" });
+      if (integration) {
+        await integration.recordSuccess();
+      }
+    } catch (error) {
+      // Silently fail - don't disrupt actual operations
+    }
+  }
+
+  /**
+   * Record failed API request in database
+   */
+  async recordApiFailure(errorMessage) {
+    try {
+      const integration = await Integration.findOne({ name: "shiprocket" });
+      if (integration) {
+        await integration.recordFailure(errorMessage);
+      }
+    } catch (error) {
+      // Silently fail - don't disrupt actual operations
+    }
+  }
+
+  /**
+   * Get integration statistics
+   */
+  async getStats() {
+    try {
+      const integration = await Integration.findOne({ name: "shiprocket" });
+      if (!integration) {
+        return null;
+      }
+
+      return {
+        status: integration.status,
+        totalRequests: integration.stats.totalRequests,
+        successfulRequests: integration.stats.successfulRequests,
+        failedRequests: integration.stats.failedRequests,
+        successRate:
+          integration.stats.totalRequests > 0
+            ? (
+                (integration.stats.successfulRequests /
+                  integration.stats.totalRequests) *
+                100
+              ).toFixed(2) + "%"
+            : "N/A",
+        lastRequestAt: integration.stats.lastRequestAt,
+        lastSuccessAt: integration.stats.lastSuccessAt,
+        lastError: integration.lastError,
+        tokenExpiry: integration.token.expiresAt,
+        isTokenValid: integration.isTokenValid(),
+        customData: integration.data, // Shiprocket-specific fields
+      };
+    } catch (error) {
+      throw new Error(`Failed to get stats: ${error.message}`);
     }
   }
 
@@ -96,13 +284,13 @@ class ShiprocketService {
   async createOrder(order, pickupLocation = "Primary") {
     // Prepare order items
     const orderItems = order.items.map((item) => ({
-      name: item.productName || "Fashion Item",
-      sku: item.productId || item.sku || "NO-SKU",
+      name: item.name || "Fashion Item",
+      sku: item.sku || "NO-SKU",
       units: item.quantity || 1,
       selling_price: item.price || 0,
-      discount: item.discount || 0,
-      tax: item.tax || 0,
-      hsn: item.hsn || "",
+      discount: 0,
+      tax: 0,
+      hsn: "",
     }));
 
     // Calculate dimensions and weight
@@ -117,22 +305,22 @@ class ShiprocketService {
       comment: order.notes || "",
       billing_customer_name: order.customer.name,
       billing_last_name: "",
-      billing_address: order.shippingAddress.address,
-      billing_address_2: order.shippingAddress.address2 || "",
-      billing_city: order.shippingAddress.city,
-      billing_pincode: order.shippingAddress.pincode,
-      billing_state: order.shippingAddress.state,
-      billing_country: order.shippingAddress.country || "India",
+      billing_address: order.customer.address.line1 || "",
+      billing_address_2: order.customer.address.line2 || "",
+      billing_city: order.customer.address.city || "",
+      billing_pincode: order.customer.address.pincode || "",
+      billing_state: order.customer.address.state || "",
+      billing_country: order.customer.address.country || "India",
       billing_email: order.customer.email || "",
       billing_phone: order.customer.phone,
       shipping_is_billing: true,
       order_items: orderItems,
-      payment_method: order.paymentMethod === "COD" ? "COD" : "Prepaid",
-      shipping_charges: order.shippingCharges || 0,
+      payment_method: order.payment.method === "COD" ? "COD" : "Prepaid",
+      shipping_charges: order.pricing.shippingCharge || 0,
       giftwrap_charges: 0,
       transaction_charges: 0,
-      total_discount: order.discount || 0,
-      sub_total: order.totalAmount,
+      total_discount: order.pricing.discount || 0,
+      sub_total: order.pricing.total || 0,
       length: dimensions.length,
       breadth: dimensions.breadth,
       height: dimensions.height,
@@ -485,6 +673,24 @@ class ShiprocketService {
     } catch (error) {
       console.error("Error handling Shiprocket webhook:", error);
       throw error;
+    }
+  }
+
+  /**
+   * Get list of pickup locations configured in Shiprocket account
+   * @returns {Array} Array of pickup locations with address details
+   */
+  async getPickupLocations() {
+    try {
+      const response = await this.apiRequest("GET", "/settings/company/pickup");
+
+      // The response contains pickup locations data
+      return {
+        success: true,
+        locations: response.data || response.shipping_address || [],
+      };
+    } catch (error) {
+      throw new Error(`Failed to fetch pickup locations: ${error.message}`);
     }
   }
 }

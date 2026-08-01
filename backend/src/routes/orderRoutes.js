@@ -1,6 +1,7 @@
 import express from "express";
 import Order from "../models/Order.js";
 import Product from "../models/Product.js";
+import Customer from "../models/Customer.js";
 import { authMiddleware } from "../middleware/auth.js";
 
 const router = express.Router();
@@ -137,7 +138,7 @@ router.post("/", async (req, res) => {
       });
     }
 
-    // Validate items
+    // Validate items and calculate subtotals
     for (const item of items) {
       if (
         !item.sku ||
@@ -150,11 +151,68 @@ router.post("/", async (req, res) => {
           error: "Each item must have sku, name, quantity, and price",
         });
       }
+
+      // Calculate subtotal for each item (required by schema)
+      item.subtotal = item.quantity * item.price;
     }
 
-    // Create order
+    // Find or create customer
+    let customerDoc = await Customer.findOne({ phone: customer.phone });
+
+    if (!customerDoc) {
+      // Create new customer
+      customerDoc = new Customer({
+        name: customer.name,
+        phone: customer.phone,
+        email: customer.email || undefined,
+        addresses: customer.address ? [{
+          label: "Default",
+          street: customer.address.line1 || "",
+          city: customer.address.city || "",
+          state: customer.address.state || "",
+          pincode: customer.address.pincode || "",
+          country: customer.address.country || "India",
+          isDefault: true,
+        }] : [],
+        source: source || "manual",
+        tags: ["manual-order"],
+      });
+
+      await customerDoc.save();
+      console.log(`✓ Created new customer: ${customerDoc.name} (${customerDoc.phone})`);
+    } else {
+      // Update existing customer's address if provided and different
+      if (customer.address && customer.address.line1) {
+        const hasAddress = customerDoc.addresses.some(addr => 
+          addr.street === customer.address.line1 && 
+          addr.pincode === customer.address.pincode
+        );
+
+        if (!hasAddress) {
+          customerDoc.addresses.push({
+            label: "Order Address",
+            street: customer.address.line1,
+            city: customer.address.city || "",
+            state: customer.address.state || "",
+            pincode: customer.address.pincode || "",
+            country: customer.address.country || "India",
+            isDefault: customerDoc.addresses.length === 0,
+          });
+          await customerDoc.save();
+          console.log(`✓ Added new address for customer: ${customerDoc.name}`);
+        }
+      }
+    }
+
+    // Create order with customer reference
     const order = new Order({
-      customer,
+      customer: {
+        _id: customerDoc._id,
+        name: customerDoc.name,
+        phone: customerDoc.phone,
+        email: customerDoc.email || customer.email,
+        address: customer.address || {},
+      },
       items,
       pricing: pricing || {},
       payment: payment || {},
@@ -163,10 +221,25 @@ router.post("/", async (req, res) => {
       notes: notes || "",
       internalNotes: internalNotes || "",
       vendorId: vendorId || null,
-      createdBy: req.user.id,
+      createdBy: req.admin.id,
     });
 
     await order.save();
+
+    // Update customer metrics
+    customerDoc.totalOrders += 1;
+    customerDoc.totalSpent += pricing?.total || 0;
+    customerDoc.averageOrderValue = customerDoc.totalSpent / customerDoc.totalOrders;
+    customerDoc.lastOrderDate = new Date();
+    
+    // Update customer type based on orders
+    if (customerDoc.totalOrders >= 10) {
+      customerDoc.customerType = "vip";
+    } else if (customerDoc.totalOrders >= 3) {
+      customerDoc.customerType = "regular";
+    }
+
+    await customerDoc.save();
 
     res.status(201).json({
       success: true,
@@ -273,7 +346,7 @@ router.patch("/:id/status", async (req, res) => {
       });
     }
 
-    await order.updateStatus(status, note, req.user.id);
+    await order.updateStatus(status, note, req.admin.id);
 
     res.json({
       success: true,
@@ -388,7 +461,7 @@ router.post("/bulk-status", async (req, res) => {
     const orders = await Order.find({ _id: { $in: ids } });
 
     for (const order of orders) {
-      await order.updateStatus(status, note, req.user.id);
+      await order.updateStatus(status, note, req.admin.id);
     }
 
     res.json({
@@ -431,7 +504,7 @@ router.delete("/:id", async (req, res) => {
     await order.updateStatus(
       "cancelled",
       "Order cancelled by admin",
-      req.user.id,
+      req.admin.id,
     );
 
     res.json({
