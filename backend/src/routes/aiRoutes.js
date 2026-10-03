@@ -1,4 +1,5 @@
 import express from "express";
+import mongoose from "mongoose";
 import multer from "multer";
 import embeddingService from "../services/embeddingService.js";
 import aiStylingService from "../services/aiStylingService.js";
@@ -140,7 +141,8 @@ router.post(
 
       // Get product details
       let productDetails = null;
-      if (productId) {
+      // Validate productId is a valid ObjectId (not "undefined" string or empty)
+      if (productId && productId !== "undefined" && mongoose.Types.ObjectId.isValid(productId)) {
         productDetails = await Product.findById(productId)
           .select("name colors fabric workType")
           .lean();
@@ -175,6 +177,13 @@ router.get("/similar-products/:productId", async (req, res) => {
   try {
     const { productId } = req.params;
     const limit = parseInt(req.query.limit) || 10;
+
+    // Validate productId
+    if (!productId || productId === "undefined" || !mongoose.Types.ObjectId.isValid(productId)) {
+      return res.status(400).json({
+        error: "Invalid product ID",
+      });
+    }
 
     // Get the source product
     const sourceProduct = await Product.findById(productId)

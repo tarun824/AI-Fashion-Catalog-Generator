@@ -293,6 +293,7 @@ router.get("/products/:slug", async (req, res) => {
 
     // Transform for public consumption (hide internal fields)
     const publicProduct = {
+      _id: product._id, // Keep _id for frontend compatibility
       id: product._id,
       sku: product.sku,
       name: product.name,

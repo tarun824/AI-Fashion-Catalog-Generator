@@ -50,7 +50,12 @@ export default function VirtualTryOnModal({ product, onClose }) {
       
       const productImageBlob = await productImageResponse.blob();
       formData.append("product", productImageBlob, "product.jpg");
-      formData.append("productId", product._id);
+      
+      // Use _id or id (public API returns both)
+      const productId = product._id || product.id;
+      if (productId) {
+        formData.append("productId", productId);
+      }
 
       const response = await fetch(`${API_BASE_URL}/ai/virtual-tryon`, {
         method: "POST",
