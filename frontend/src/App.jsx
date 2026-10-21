@@ -27,6 +27,7 @@ import BatchUploadPage from "./pages/BatchUploadPage";
 import SmartStagingPage from "./pages/SmartStagingPage";
 import SearchPage from "./pages/SearchPage";
 import Integrations from "./pages/Integrations";
+import ApiLogs from "./pages/ApiLogs";
 import Inventory from "./pages/Inventory";
 import Customers from "./pages/Customers";
 import CustomerDetail from "./pages/CustomerDetail";
@@ -105,6 +106,7 @@ function App() {
                     />
                     <Route path="search" element={<SearchPage />} />
                     <Route path="integrations" element={<Integrations />} />
+                    <Route path="api-logs" element={<ApiLogs />} />
                     <Route path="audits" element={<Audits />} />
                   </Route>
 

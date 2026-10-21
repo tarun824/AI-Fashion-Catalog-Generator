@@ -15,8 +15,67 @@
 import axios from "axios";
 import dotenv from "dotenv";
 import Integration from "../models/Integration.js";
+import {
+  recordApiCall,
+  newCallId,
+} from "../integrations/logging/apiCallLogger.js";
 
 dotenv.config();
+
+const PROVIDER = "shiprocket";
+
+/** Endpoint pattern -> operation name (first match wins). */
+const OPERATION_MAP = [
+  [/^\/auth\/login/, "token"],
+  [/^\/orders\/create\/adhoc/, "createOrder"],
+  [/^\/orders\/create\/return/, "createReturn"],
+  [/^\/orders\/cancel\/shipment/, "cancelShipment"],
+  [/^\/orders\/schedule-pickup/, "schedulePickup"],
+  [/^\/courier\/serviceability/, "courierRates"],
+  [/^\/courier\/assign\/awb/, "assignCourier"],
+  [/^\/courier\/generate\/label/, "generateLabel"],
+  [/^\/courier\/track/, "track"],
+  [/^\/accounts\/statements/, "accountStatements"],
+  [/^\/settings\/company\/pickup/, "pickupLocations"],
+];
+
+function deriveOperation(endpoint) {
+  const ep = String(endpoint || "");
+  for (const [re, op] of OPERATION_MAP) {
+    if (re.test(ep)) return op;
+  }
+  console.warn(`[Shiprocket] no operation mapping for endpoint=${ep.split("?")[0]}`);
+  return "request";
+}
+
+/** Fire-and-forget API call record. recordApiCall never throws; guard anyway. */
+function logApiCall(entry) {
+  try {
+    recordApiCall({ provider: PROVIDER, direction: "outbound", attempt: 1, ...entry });
+  } catch (e) {
+    console.warn(`[Shiprocket] api call log failed operation=${entry?.operation} reason=${e.message}`);
+  }
+}
+
+function logFromError({ operation, method, url, headers, requestBody, startedAt, error }) {
+  logApiCall({
+    _id: newCallId(),
+    operation,
+    method,
+    url,
+    headers,
+    requestBody,
+    status: error?.response?.status,
+    responseHeaders: error?.response?.headers,
+    responseBody: error?.response?.data,
+    responseContentType: error?.response?.headers?.["content-type"],
+    success: false,
+    durationMs: Date.now() - startedAt.getTime(),
+    errorType: error?.response ? "http" : error?.code || "network",
+    errorMessage: error?.message,
+    startedAt,
+  });
+}
 
 class ShiprocketService {
   constructor() {
@@ -62,11 +121,27 @@ class ShiprocketService {
     }
 
     // STEP 3: Login and get new token
+    const loginUrl = `${this.baseURL}/auth/login`;
+    const loginBody = { email: this.email, password: this.password };
+    const loginStartedAt = new Date();
+    let loginLogged = false;
     try {
-      const response = await axios.post(`${this.baseURL}/auth/login`, {
-        email: this.email,
-        password: this.password,
+      const response = await axios.post(loginUrl, loginBody);
+      logApiCall({
+        _id: newCallId(),
+        operation: "token",
+        method: "POST",
+        url: loginUrl,
+        requestBody: loginBody,
+        status: response.status,
+        responseHeaders: response.headers,
+        responseBody: response.data,
+        responseContentType: response.headers?.["content-type"],
+        success: true,
+        durationMs: Date.now() - loginStartedAt.getTime(),
+        startedAt: loginStartedAt,
       });
+      loginLogged = true;
 
       const newToken = response.data.token;
       const expiresInMs = 9 * 24 * 60 * 60 * 1000; // 9 days
@@ -83,6 +158,16 @@ class ShiprocketService {
       console.log("✓ Shiprocket authenticated successfully");
       return newToken;
     } catch (error) {
+      if (!loginLogged) {
+        logFromError({
+          operation: "token",
+          method: "POST",
+          url: loginUrl,
+          requestBody: loginBody,
+          startedAt: loginStartedAt,
+          error,
+        });
+      }
       console.error(
         "Shiprocket authentication failed:",
         error.response?.data || error.message,
@@ -129,8 +214,11 @@ class ShiprocketService {
   /**
    * Make authenticated API request
    */
-  async apiRequest(method, endpoint, data = null) {
+  async apiRequest(method, endpoint, data = null, operation = null) {
     const token = await this.getAuthToken();
+    const op = operation || deriveOperation(endpoint);
+    const callStartedAt = new Date();
+    let callConfig = null;
 
     try {
       const config = {
@@ -145,6 +233,7 @@ class ShiprocketService {
       if (data) {
         config.data = data;
       }
+      callConfig = config;
 
       // ========== DETAILED REQUEST LOGGING ==========
       console.log("\n" + "=".repeat(80));
@@ -160,6 +249,22 @@ class ShiprocketService {
       console.log("=".repeat(80) + "\n");
 
       const response = await axios(config);
+
+      logApiCall({
+        _id: newCallId(),
+        operation: op,
+        method,
+        url: config.url,
+        headers: config.headers,
+        requestBody: data || undefined,
+        status: response.status,
+        responseHeaders: response.headers,
+        responseBody: response.data,
+        responseContentType: response.headers?.["content-type"],
+        success: true,
+        durationMs: Date.now() - callStartedAt.getTime(),
+        startedAt: callStartedAt,
+      });
 
       // ========== DETAILED RESPONSE LOGGING ==========
       console.log("\n" + "=".repeat(80));
@@ -178,6 +283,16 @@ class ShiprocketService {
 
       return response.data;
     } catch (error) {
+      logFromError({
+        operation: op,
+        method,
+        url: callConfig?.url || `${this.baseURL}${endpoint}`,
+        headers: callConfig?.headers,
+        requestBody: data || undefined,
+        startedAt: callStartedAt,
+        error,
+      });
+
       // ========== DETAILED ERROR LOGGING ==========
       console.log("\n" + "=".repeat(80));
       console.log(`❌ SHIPROCKET API ERROR`);

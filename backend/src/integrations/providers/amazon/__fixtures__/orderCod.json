@@ -1,0 +1,20 @@
+{
+  "order": {
+    "AmazonOrderId": "404-0000000-0000002",
+    "PurchaseDate": "2026-09-29T08:00:00Z",
+    "OrderStatus": "Shipped",
+    "FulfillmentChannel": "AFN",
+    "PaymentMethod": "COD",
+    "OrderTotal": { "CurrencyCode": "INR", "Amount": "999.00" }
+  },
+  "items": [
+    {
+      "ASIN": "B0TESTASIN2",
+      "OrderItemId": "10000000000002",
+      "SellerSKU": "SAREE-BLUE-002",
+      "Title": "Blue Cotton Saree",
+      "QuantityOrdered": 1,
+      "ItemPrice": { "CurrencyCode": "INR", "Amount": "999.00" }
+    }
+  ]
+}

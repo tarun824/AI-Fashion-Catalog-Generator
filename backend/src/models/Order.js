@@ -403,9 +403,41 @@ const orderSchema = new Schema(
     // Order Source
     source: {
       type: String,
-      enum: ["website", "whatsapp", "phone", "email", "manual"],
+      enum: [
+        "website",
+        "whatsapp",
+        "phone",
+        "email",
+        "manual",
+        "amazon",
+        "flipkart",
+        "myntra",
+        "meesho",
+      ],
       default: "manual",
       index: true,
+    },
+
+    // Marketplace (Amazon/Flipkart/...) metadata for imported orders
+    marketplace: {
+      channel: { type: String, default: undefined },
+      externalOrderId: { type: String, default: undefined },
+      externalShipmentId: { type: String, default: null },
+      fulfillmentType: {
+        type: String,
+        enum: ["SELLER", "MARKETPLACE", null],
+        default: null,
+      },
+      dispatchByDate: { type: Date, default: null },
+      addressRedacted: { type: Boolean, default: false },
+      needsMapping: { type: Boolean, default: false },
+      // Last status reported by the marketplace (new/cancelled/shipped/...)
+      status: { type: String, default: "" },
+      syncedAt: { type: Date, default: null },
+      shipmentConfirmedAt: { type: Date, default: null },
+      shipmentConfirmError: { type: String, default: "" },
+      // Original payload for debugging; excluded from queries by default
+      rawPayload: { type: Schema.Types.Mixed, select: false },
     },
 
     // Additional Information
@@ -448,6 +480,19 @@ orderSchema.index({ "customer.phone": 1 });
 orderSchema.index({ "customer.email": 1 });
 orderSchema.index({ status: 1, createdAt: -1 });
 orderSchema.index({ createdAt: -1 });
+// Idempotent marketplace import: one Order per (channel, externalOrderId).
+// Orders are not tenant-scoped on createdBy anywhere in the app and Integration is
+// global, so the owner is intentionally NOT part of the key (re-import by another
+// admin must still dedupe). Partial so website/manual orders are unaffected.
+orderSchema.index(
+  { "marketplace.channel": 1, "marketplace.externalOrderId": 1 },
+  {
+    unique: true,
+    partialFilterExpression: {
+      "marketplace.externalOrderId": { $type: "string" },
+    },
+  },
+);
 
 /**
  * Pre-save middleware to calculate totals and generate order number

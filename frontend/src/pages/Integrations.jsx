@@ -12,6 +12,7 @@
  */
 
 import { useState, useEffect } from "react";
+import { Link } from "react-router-dom";
 import {
   CheckCircle,
   XCircle,
@@ -28,10 +29,95 @@ import {
   ShoppingCart,
   CreditCard,
   MessageSquare,
+  Key,
+  Download,
+  UploadCloud,
+  BookOpen,
+  X,
 } from "lucide-react";
 import { api } from "../utils/api";
+import { formatErrorMessage, logApiError } from "../utils/errorHandler";
+import { useToast } from "../contexts/ToastContext";
+import CredentialsModal from "../components/integrations/CredentialsModal";
+import PublishModal from "../components/integrations/PublishModal";
+import FetchSummary from "../components/integrations/FetchSummary";
+import IntegrationDocsDrawer from "../components/integrations/IntegrationDocsDrawer";
+import { summarizeFetchAll } from "../utils/integrationHelpers";
+
+// Static class maps (Tailwind cannot see dynamically built class names)
+const CATEGORY_STYLES = {
+  shipping: {
+    icon: "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300",
+    pill: "bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300",
+    btn: "bg-blue-600 hover:bg-blue-700",
+  },
+  marketplace: {
+    icon: "bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300",
+    pill: "bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-300",
+    btn: "bg-purple-600 hover:bg-purple-700",
+  },
+  payment: {
+    icon: "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300",
+    pill: "bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300",
+    btn: "bg-green-600 hover:bg-green-700",
+  },
+  messaging: {
+    icon: "bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300",
+    pill: "bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-300",
+    btn: "bg-orange-600 hover:bg-orange-700",
+  },
+  default: {
+    icon: "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300",
+    pill: "bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-300",
+    btn: "bg-gray-600 hover:bg-gray-700",
+  },
+};
+
+const OUTLINE_BTN =
+  "min-h-[44px] px-4 py-2 bg-white dark:bg-gray-700 border-2 border-gray-300 dark:border-gray-600 text-gray-800 dark:text-gray-200 rounded-lg font-medium hover:bg-gray-50 dark:hover:bg-gray-600 disabled:opacity-50 transition flex items-center gap-2";
+
+const HOW_KEY = "integrations.howItWorks.dismissed";
+const HOW_STEPS = [
+  ["Connect your account", "Paste your keys once. They are saved encrypted."],
+  ["Fetch orders", "Click a button to pull orders. Nothing runs automatically."],
+  ["Ship with Shiprocket", "Create shipments yourself, one order at a time."],
+  ["Send tracking back", "Push the tracking number to the marketplace when ready."],
+];
+
+function readHowDismissed() {
+  try {
+    return localStorage.getItem(HOW_KEY) === "1";
+  } catch (err) {
+    console.warn("[Integrations] could not read localStorage", err);
+    return false;
+  }
+}
 
 export default function Integrations() {
+  const toast = useToast();
+  const [docsFor, setDocsFor] = useState(null); // { integration, tab, field }
+  const [howDismissed, setHowDismissed] = useState(readHowDismissed);
+  const [howOpen, setHowOpen] = useState(true);
+
+  const dismissHow = () => {
+    setHowDismissed(true);
+    try {
+      localStorage.setItem(HOW_KEY, "1");
+    } catch (err) {
+      console.warn("[Integrations] could not save localStorage", err);
+    }
+  };
+  const openDocs = (integration, tab, field) =>
+    setDocsFor({ integration, tab, field });
+  const openDocsById = (id, tab) => {
+    const found = integrations.find((i) => i.id === id);
+    setDocsFor({ integration: found || { id, name: id }, tab });
+  };
+  const [credentialsFor, setCredentialsFor] = useState(null);
+  const [publishFor, setPublishFor] = useState(null);
+  const [fetchingId, setFetchingId] = useState(null);
+  const [fetchingAll, setFetchingAll] = useState(false);
+  const [fetchResults, setFetchResults] = useState(null);
   const [integrations, setIntegrations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [testingId, setTestingId] = useState(null);
@@ -45,32 +131,19 @@ export default function Integrations() {
   const loadIntegrations = async () => {
     setLoading(true);
     try {
-      console.log(
-        "🔄 Loading integrations from:",
-        `${import.meta.env.VITE_API_BASE_URL}/admin/integrations`,
-      );
       const response = await api.get("/admin/integrations");
-      console.log("✅ Integrations response:", response);
 
       // The api.get() returns the parsed JSON directly
       // Backend returns: { success: true, integrations: [...] }
       if (response && response.integrations) {
         setIntegrations(response.integrations);
-        console.log(`✓ Loaded ${response.integrations.length} integrations`);
       } else {
         console.warn("⚠️ Unexpected response structure:", response);
         setIntegrations([]);
       }
     } catch (error) {
-      console.error("❌ Error loading integrations:", error);
-      console.error("Error details:", {
-        message: error.message,
-        status: error.status,
-        response: error.response,
-      });
-      alert(
-        `Failed to load integrations: ${error.message}\n\nMake sure you are logged in and backend is running.`,
-      );
+      logApiError("Load integrations", error);
+      toast.error(formatErrorMessage(error), 8000);
       setIntegrations([]);
     } finally {
       setLoading(false);
@@ -87,17 +160,21 @@ export default function Integrations() {
       // api.post() returns parsed JSON directly
       // Backend returns: { success: true/false, message: "...", data: {...} }
       if (response.success) {
-        alert(
-          `✅ ${integrationId} connection successful!\n\n${response.message || ""}`,
+        toast.success(
+          `${integrationId} connection successful. ${response.message || ""}`.trim(),
         );
       } else {
-        alert(`❌ ${integrationId} test failed: ${response.message}`);
+        toast.error(
+          `${integrationId} test failed: ${response.message || "unknown reason"}. Check the saved keys and try again.`,
+          8000,
+        );
       }
 
       // Reload to update status
       await loadIntegrations();
     } catch (error) {
-      alert(`❌ Error testing ${integrationId}: ${error.message}`);
+      logApiError(`Test ${integrationId}`, error);
+      toast.error(formatErrorMessage(error), 8000);
     } finally {
       setTestingId(null);
     }
@@ -109,7 +186,46 @@ export default function Integrations() {
       setCopiedWebhook(integrationId);
       setTimeout(() => setCopiedWebhook(null), 2000);
     } catch (error) {
-      alert("Failed to copy webhook URL");
+      console.error("Failed to copy webhook URL:", error);
+      toast.error(
+        "Could not copy the webhook URL. Select and copy it manually.",
+      );
+    }
+  };
+
+  const fetchOrders = async (integration) => {
+    setFetchingId(integration.id);
+    try {
+      const res = await api.post(
+        `/admin/integrations/${integration.id}/fetch-orders`,
+        {},
+      );
+      setFetchResults({ [integration.id]: res });
+      toast.success(
+        `${integration.name}: ${res.imported ?? 0} new, ${res.updated ?? 0} updated order(s).`,
+      );
+      await loadIntegrations();
+    } catch (error) {
+      logApiError(`Fetch orders ${integration.id}`, error);
+      toast.error(formatErrorMessage(error), 8000);
+    } finally {
+      setFetchingId(null);
+    }
+  };
+
+  const fetchAllOrders = async () => {
+    setFetchingAll(true);
+    try {
+      const res = await api.post("/admin/integrations/fetch-all", {});
+      setFetchResults(res.results || {});
+      const { message, tone } = summarizeFetchAll(res.results);
+      toast[tone](message, 7000);
+      await loadIntegrations();
+    } catch (error) {
+      logApiError("Fetch orders from all", error);
+      toast.error(formatErrorMessage(error), 8000);
+    } finally {
+      setFetchingAll(false);
     }
   };
 
@@ -128,20 +244,8 @@ export default function Integrations() {
     }
   };
 
-  const getCategoryColor = (category) => {
-    switch (category) {
-      case "shipping":
-        return "blue";
-      case "marketplace":
-        return "purple";
-      case "payment":
-        return "green";
-      case "messaging":
-        return "orange";
-      default:
-        return "gray";
-    }
-  };
+  const getCategoryStyle = (category) =>
+    CATEGORY_STYLES[category] || CATEGORY_STYLES.default;
 
   if (loading) {
     return (
@@ -198,7 +302,7 @@ export default function Integrations() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
             Integrations
@@ -208,14 +312,95 @@ export default function Integrations() {
             services
           </p>
         </div>
-        <button
-          onClick={loadIntegrations}
-          className="px-4 py-2 bg-white dark:bg-gray-800 border-2 border-gray-300 dark:border-gray-700 text-gray-700 dark:text-white rounded-lg font-medium hover:bg-gray-50 dark:hover:bg-gray-700 transition flex items-center gap-2"
-        >
-          <RefreshCw className="w-4 h-4" />
-          Refresh Status
-        </button>
+        <div className="flex flex-wrap gap-2">
+          {integrations.some((i) => i.capabilities?.fetchOrders) && (
+            <button
+              onClick={fetchAllOrders}
+              disabled={fetchingAll}
+              className="min-h-[44px] px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium disabled:opacity-50 transition flex items-center gap-2"
+            >
+              {fetchingAll ? (
+                <>
+                  <RefreshCw className="w-4 h-4 animate-spin" />
+                  Fetching orders...
+                </>
+              ) : (
+                <>
+                  <Download className="w-4 h-4" />
+                  Fetch orders from all
+                </>
+              )}
+            </button>
+          )}
+          <button
+            onClick={loadIntegrations}
+            className="min-h-[44px] px-4 py-2 bg-white dark:bg-gray-800 border-2 border-gray-300 dark:border-gray-700 text-gray-700 dark:text-white rounded-lg font-medium hover:bg-gray-50 dark:hover:bg-gray-700 transition flex items-center gap-2"
+          >
+            <RefreshCw className="w-4 h-4" />
+            Refresh Status
+          </button>
+        </div>
       </div>
+
+      {fetchResults && (
+        <FetchSummary
+          results={fetchResults}
+          onDismiss={() => setFetchResults(null)}
+          onOpenDocs={openDocsById}
+        />
+      )}
+
+      {/* How integrations work */}
+      {!howDismissed && (
+        <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-4">
+          <div className="flex items-center justify-between gap-2">
+            <button
+              type="button"
+              onClick={() => setHowOpen((v) => !v)}
+              aria-expanded={howOpen}
+              className="flex-1 min-h-[44px] flex items-center gap-2 text-left font-semibold text-gray-900 dark:text-white"
+            >
+              <BookOpen className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+              How integrations work
+              {howOpen ? (
+                <ChevronUp className="w-4 h-4" />
+              ) : (
+                <ChevronDown className="w-4 h-4" />
+              )}
+            </button>
+            <button
+              type="button"
+              onClick={dismissHow}
+              aria-label="Dismiss how integrations work"
+              className="min-w-[44px] min-h-[44px] flex items-center justify-center text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+          {howOpen && (
+            <>
+              <ol className="mt-2 space-y-2">
+                {HOW_STEPS.map(([title, text], i) => (
+                  <li key={title} className="flex items-start gap-3 text-sm">
+                    <span className="flex-shrink-0 w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center font-bold text-xs">
+                      {i + 1}
+                    </span>
+                    <p className="text-gray-800 dark:text-gray-200">
+                      <strong>{title}</strong> - {text}
+                    </p>
+                  </li>
+                ))}
+              </ol>
+              <Link
+                to="/admin/api-logs"
+                className="inline-flex items-center min-h-[44px] mt-1 text-sm underline text-blue-700 dark:text-blue-300"
+              >
+                View API Logs
+              </Link>
+            </>
+          )}
+        </div>
+      )}
 
       {/* Info Banner */}
       <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-4">
@@ -332,7 +517,9 @@ export default function Integrations() {
       {/* Integrations List */}
       <div className="space-y-4">
         {integrations.map((integration) => {
-          const color = getCategoryColor(integration.category);
+          const style = getCategoryStyle(integration.category);
+          const features = integration.features || [];
+          const caps = integration.capabilities || {};
           const isExpanded = expandedId === integration.id;
 
           return (
@@ -341,11 +528,11 @@ export default function Integrations() {
               className="bg-white dark:bg-gray-800 rounded-xl shadow-md hover:shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden transition-all duration-300 hover:scale-[1.01]"
             >
               {/* Main Card */}
-              <div className="p-6">
+              <div className="p-4 sm:p-6">
                 <div className="flex items-start gap-4">
                   {/* Icon */}
                   <div
-                    className={`p-3 bg-${color}-100 dark:bg-${color}-900/30 rounded-xl flex-shrink-0`}
+                    className={`p-3 ${style.icon} rounded-xl flex-shrink-0`}
                   >
                     {getCategoryIcon(integration.category)}
                   </div>
@@ -359,7 +546,7 @@ export default function Integrations() {
                             {integration.name}
                           </h3>
                           <span
-                            className={`px-2 py-0.5 text-xs font-medium rounded-full bg-${color}-100 dark:bg-${color}-900/30 text-${color}-700 dark:text-${color}-300`}
+                            className={`px-2 py-0.5 text-xs font-medium rounded-full ${style.pill}`}
                           >
                             {integration.category}
                           </span>
@@ -409,11 +596,37 @@ export default function Integrations() {
                       {new Date(
                         integration.status.lastChecked,
                       ).toLocaleTimeString()}
+                      {integration.lastSyncAt && (
+                        <>
+                          {" • "}Orders last synced:{" "}
+                          {new Date(integration.lastSyncAt).toLocaleString()}
+                        </>
+                      )}
                     </p>
+
+                    {/* API logs links */}
+                    <div className="flex flex-wrap gap-x-4 mb-2">
+                      <Link
+                        to={`/admin/api-logs?provider=${encodeURIComponent(integration.id)}`}
+                        className="inline-flex items-center min-h-[44px] text-sm underline text-blue-700 dark:text-blue-300"
+                      >
+                        View logs
+                      </Link>
+                      {integration.lastSyncCorrelationId && (
+                        <Link
+                          to={`/admin/api-logs?correlationId=${encodeURIComponent(integration.lastSyncCorrelationId)}`}
+                          className="inline-flex items-center min-h-[44px] text-sm underline text-blue-700 dark:text-blue-300"
+                        >
+                          {integration.lastError
+                            ? "Last sync calls (failed)"
+                            : "Last sync calls"}
+                        </Link>
+                      )}
+                    </div>
 
                     {/* Features */}
                     <div className="flex flex-wrap gap-2 mb-4">
-                      {integration.features
+                      {features
                         .slice(0, 3)
                         .map((feature, index) => (
                           <span
@@ -423,9 +636,9 @@ export default function Integrations() {
                             {feature}
                           </span>
                         ))}
-                      {integration.features.length > 3 && (
+                      {features.length > 3 && (
                         <span className="px-2 py-1 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 text-xs rounded-md">
-                          +{integration.features.length - 3} more
+                          +{features.length - 3} more
                         </span>
                       )}
                     </div>
@@ -433,13 +646,32 @@ export default function Integrations() {
                     {/* Actions */}
                     <div className="flex flex-wrap gap-3">
                       <button
+                        type="button"
+                        onClick={() => openDocs(integration)}
+                        aria-label={`${integration.name} setup guide`}
+                        className={OUTLINE_BTN}
+                      >
+                        <BookOpen className="w-4 h-4" />
+                        Guide
+                      </button>
+                      {integration.hasCredentialFields && (
+                        <button
+                          onClick={() => setCredentialsFor(integration)}
+                          className={`min-h-[44px] px-4 py-2 text-white rounded-lg font-medium transition flex items-center gap-2 ${style.btn}`}
+                        >
+                          <Key className="w-4 h-4" />
+                          {integration.configured ? "Edit keys" : "Connect"}
+                        </button>
+                      )}
+
+                      <button
                         onClick={() => testConnection(integration.id)}
                         disabled={testingId === integration.id}
-                        className={`
-                          px-4 py-2 bg-${color}-600 text-white rounded-lg font-medium
-                          hover:bg-${color}-700 disabled:opacity-50 transition
-                          flex items-center gap-2
-                        `}
+                        className={
+                          integration.hasCredentialFields
+                            ? OUTLINE_BTN
+                            : `min-h-[44px] px-4 py-2 text-white rounded-lg font-medium disabled:opacity-50 transition flex items-center gap-2 ${style.btn}`
+                        }
                       >
                         {testingId === integration.id ? (
                           <>
@@ -454,11 +686,44 @@ export default function Integrations() {
                         )}
                       </button>
 
+                      {caps.fetchOrders && integration.configured && (
+                        <button
+                          onClick={() => fetchOrders(integration)}
+                          disabled={
+                            fetchingId === integration.id || fetchingAll
+                          }
+                          className={OUTLINE_BTN}
+                        >
+                          {fetchingId === integration.id ? (
+                            <>
+                              <RefreshCw className="w-4 h-4 animate-spin" />
+                              Fetching...
+                            </>
+                          ) : (
+                            <>
+                              <Download className="w-4 h-4" />
+                              Fetch orders
+                            </>
+                          )}
+                        </button>
+                      )}
+
+                      {caps.publishProducts && integration.configured && (
+                        <button
+                          onClick={() => setPublishFor(integration)}
+                          className={OUTLINE_BTN}
+                        >
+                          <UploadCloud className="w-4 h-4" />
+                          Publish products
+                        </button>
+                      )}
+
+                      {integration.webhookUrl && (
                       <button
                         onClick={() =>
                           copyWebhookUrl(integration.webhookUrl, integration.id)
                         }
-                        className="px-4 py-2 bg-white dark:bg-gray-700 border-2 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg font-medium hover:bg-gray-50 dark:hover:bg-gray-600 transition flex items-center gap-2"
+                        className={OUTLINE_BTN}
                       >
                         {copiedWebhook === integration.id ? (
                           <>
@@ -472,22 +737,25 @@ export default function Integrations() {
                           </>
                         )}
                       </button>
+                      )}
 
+                      {integration.docsUrl && (
                       <a
                         href={integration.docsUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="px-4 py-2 bg-white dark:bg-gray-700 border-2 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg font-medium hover:bg-gray-50 dark:hover:bg-gray-600 transition flex items-center gap-2"
+                        className={OUTLINE_BTN}
                       >
                         <ExternalLink className="w-4 h-4" />
                         Docs
                       </a>
+                      )}
 
                       <button
                         onClick={() =>
                           setExpandedId(isExpanded ? null : integration.id)
                         }
-                        className="px-4 py-2 bg-white dark:bg-gray-700 border-2 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg font-medium hover:bg-gray-50 dark:hover:bg-gray-600 transition flex items-center gap-2"
+                        className={OUTLINE_BTN}
                       >
                         {isExpanded ? (
                           <>
@@ -510,7 +778,7 @@ export default function Integrations() {
               {isExpanded && (
                 <div className="border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50 p-6">
                   {/* Setup Instructions for Not Configured */}
-                  {!integration.configured && (
+                  {!integration.configured && !integration.hasCredentialFields && (
                     <div className="mb-6 bg-yellow-50 dark:bg-yellow-900/10 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
                       <div className="flex items-start gap-3">
                         <AlertCircle className="w-5 h-5 text-yellow-600 dark:text-yellow-400 flex-shrink-0 mt-0.5" />
@@ -570,7 +838,7 @@ export default function Integrations() {
                         Features
                       </h4>
                       <ul className="space-y-2">
-                        {integration.features.map((feature, index) => (
+                        {features.map((feature, index) => (
                           <li
                             key={index}
                             className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300"
@@ -588,6 +856,31 @@ export default function Integrations() {
           );
         })}
       </div>
+
+      {credentialsFor && (
+        <CredentialsModal
+          integration={credentialsFor}
+          onClose={() => setCredentialsFor(null)}
+          onChanged={loadIntegrations}
+          onOpenDocs={(tab, field) => openDocs(credentialsFor, tab, field)}
+        />
+      )}
+      {docsFor && (
+        <IntegrationDocsDrawer
+          providerId={docsFor.integration.id}
+          providerName={docsFor.integration.name}
+          initialTab={docsFor.tab}
+          focusField={docsFor.field}
+          onClose={() => setDocsFor(null)}
+        />
+      )}
+      {publishFor && (
+        <PublishModal
+          providerId={publishFor.id}
+          onClose={() => setPublishFor(null)}
+          onPublished={loadIntegrations}
+        />
+      )}
 
       {/* Help Section */}
       <div className="bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 dark:from-blue-900/20 dark:via-indigo-900/20 dark:to-purple-900/20 border-2 border-blue-200 dark:border-blue-800 rounded-2xl p-8 shadow-lg">

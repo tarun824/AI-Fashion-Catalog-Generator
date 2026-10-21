@@ -11,6 +11,8 @@ import ShippingWizard from "../components/ShippingWizard";
 import ShippingTracking from "../components/ShippingTracking";
 import ShippingConfirmModal from "../components/ShippingConfirmModal";
 import OneClickShip from "../components/OneClickShip";
+import MarketplaceOrderPanel from "../components/integrations/MarketplaceOrderPanel";
+import OrderApiHistory from "../components/integrations/OrderApiHistory";
 import { format } from "date-fns";
 import { Truck, Package, AlertCircle } from "lucide-react";
 
@@ -189,6 +191,7 @@ export default function OrderDetail() {
           </button> */}
           {order.status !== "cancelled" && order.status !== "delivered" && (
             <>
+              {order.marketplace?.fulfillmentType !== "MARKETPLACE" && (
               <button
                 onClick={() => setShowShippingConfirm(true)}
                 disabled={order.status === "pending"}
@@ -197,6 +200,7 @@ export default function OrderDetail() {
                 <Package className="w-4 h-4" />
                 Ship with Options
               </button>
+              )}
               <button
                 onClick={handleCancelOrder}
                 className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition"
@@ -403,6 +407,12 @@ export default function OrderDetail() {
           </div>
         </div>
       )}
+
+      {/* Marketplace (Amazon/Flipkart/...) details */}
+      <MarketplaceOrderPanel order={order} onUpdated={loadOrder} />
+
+      {/* External API calls for this order */}
+      <OrderApiHistory order={order} />
 
       {/* Customer Information - FIRST for business users */}
       <div className="bg-white p-6 rounded-lg shadow border border-gray-200">

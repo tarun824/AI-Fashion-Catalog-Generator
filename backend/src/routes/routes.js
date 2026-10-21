@@ -17,6 +17,7 @@ import customerRoutes from "./customerRoutes.js";
 import inventoryRoutes from "./inventoryRoutes.js";
 import shippingRoutes from "./shippingRoutes.js";
 import integrationRoutes from "./integrationRoutes.js";
+import apiCallRoutes from "./apiCallRoutes.js";
 import setupRoutes from "./setupRoutes.js";
 import aiRoutes from "./aiRoutes.js";
 import auditRoutes from "./auditRoutes.js";
@@ -32,8 +33,60 @@ import {
 } from "../middleware/security.js";
 import shiprocketService from "../services/shiprocketService.js";
 import Order from "../models/Order.js";
+import {
+  runWithApiContext,
+  updateApiContext,
+  newCorrelationId,
+} from "../integrations/logging/apiCallContext.js";
+import { recordApiCall, newCallId } from "../integrations/logging/apiCallLogger.js";
 
 const router = express.Router();
+
+/** Operation name for an inbound Shiprocket webhook: webhook:<status/event>. */
+const webhookOperation = (payload) =>
+  `webhook:${String(
+    payload?.current_status || payload?.shipment_status || payload?.event || "status_update",
+  ).slice(0, 60)}`;
+
+/** Record an inbound webhook call. Never throws, never changes the response. */
+function logInboundWebhook(req, { operation, startedAt, status, success, responseBody, error }) {
+  try {
+    recordApiCall({
+      _id: newCallId(),
+      provider: "shiprocket",
+      operation,
+      direction: "inbound",
+      attempt: 1,
+      method: req.method,
+      url: req.originalUrl || req.url,
+      headers: req.headers,
+      requestBody: req.body,
+      status,
+      responseBody,
+      responseContentType: "application/json",
+      success,
+      durationMs: Date.now() - startedAt.getTime(),
+      errorType: success ? undefined : "webhook_error",
+      errorMessage: error?.message,
+      startedAt,
+    });
+  } catch (e) {
+    console.warn(`[Webhook] inbound call log failed operation=${operation} reason=${e.message}`);
+  }
+}
+
+/** Run a webhook handler inside a fresh 'webhook' API context. */
+const withWebhookContext = (operation, fn) =>
+  runWithApiContext(
+    {
+      correlationId: newCorrelationId(),
+      operation,
+      trigger: "webhook",
+      provider: "shiprocket",
+      context: {},
+    },
+    fn,
+  );
 const MAX_FILES = Number(process.env.MAX_BATCH_SIZE ?? 200);
 const MAX_FILE_SIZE_MB = Number(process.env.MAX_IMAGE_MB ?? 20);
 const MODEL = process.env.OPENAI_VISION_MODEL ?? "gpt-4o-mini";
@@ -60,7 +113,10 @@ router.get("/health", (req, res) => {
  * Test webhook handling with sample data
  */
 if (isDevelopment()) {
-  router.post("/webhooks/test", async (req, res) => {
+  router.post("/webhooks/test", (req, res) => {
+    const operation = webhookOperation(req.body);
+    return withWebhookContext(operation, async () => {
+    const startedAt = new Date();
     console.log("\n" + "=".repeat(80));
     console.log("🧪 TEST WEBHOOK RECEIVED");
     console.log("=".repeat(80));
@@ -72,10 +128,19 @@ if (isDevelopment()) {
     console.log("🌐 IP:", req.ip || req.connection.remoteAddress);
     console.log("=".repeat(80) + "\n");
 
-    res.json({
+    const testResponse = {
       success: true,
       message: "Test webhook received and logged",
       received: req.body,
+    };
+    logInboundWebhook(req, {
+      operation,
+      startedAt,
+      status: 200,
+      success: true,
+      responseBody: testResponse,
+    });
+    res.json(testResponse);
     });
   });
 }
@@ -86,7 +151,15 @@ if (isDevelopment()) {
  */
 
 // Shiprocket webhook - receives shipment status updates
-router.post("/webhooks/shiprocket", async (req, res) => {
+router.post("/webhooks/shiprocket", (req, res) =>
+  withWebhookContext(webhookOperation(req.body), () =>
+    handleShiprocketWebhook(req, res),
+  ),
+);
+
+async function handleShiprocketWebhook(req, res) {
+  const startedAt = new Date();
+  const operation = webhookOperation(req.body);
   try {
     const rawPayload = req.body;
 
@@ -124,6 +197,12 @@ router.post("/webhooks/shiprocket", async (req, res) => {
     });
 
     if (order) {
+      updateApiContext({
+        context: {
+          orderId: String(order._id),
+          externalOrderId: order.marketplace?.externalOrderId,
+        },
+      });
       // 1. Store raw webhook event for audit/debugging
       order.webhookHistory.push({
         receivedAt: new Date(),
@@ -237,15 +316,31 @@ router.post("/webhooks/shiprocket", async (req, res) => {
       console.log("=".repeat(80) + "\n");
     }
 
-    res.json({ success: true, message: "Webhook processed" });
+    const okBody = { success: true, message: "Webhook processed" };
+    logInboundWebhook(req, {
+      operation,
+      startedAt,
+      status: 200,
+      success: true,
+      responseBody: okBody,
+    });
+    res.json(okBody);
   } catch (error) {
     console.log("❌ WEBHOOK PROCESSING ERROR");
     console.error("   Error:", error.message);
     console.error("   Stack:", error.stack);
     console.log("=".repeat(80) + "\n");
+    logInboundWebhook(req, {
+      operation,
+      startedAt,
+      status: 500,
+      success: false,
+      responseBody: { error: error.message },
+      error,
+    });
     res.status(500).json({ error: error.message });
   }
-});
+}
 
 const uploadMiddleware = upload.array("images", MAX_FILES);
 
@@ -422,6 +517,7 @@ router.use("/admin/customers", apiLimiter, customerRoutes);
 router.use("/admin/inventory", apiLimiter, inventoryRoutes);
 router.use("/admin/shipping", apiLimiter, shippingRoutes);
 router.use("/admin/integrations", apiLimiter, integrationRoutes);
+router.use("/admin/api-calls", apiLimiter, apiCallRoutes);
 router.use("/admin/setup", apiLimiter, setupRoutes);
 router.use("/admin/audits", apiLimiter, auditRoutes);
 router.use("/admin/staging", apiLimiter, stagingRoutes); // Smart Staging System

@@ -4,6 +4,8 @@ import { api } from "../utils/api";
 import { format } from "date-fns";
 import ShareModal from "../components/ShareModal";
 import EmptyState from "../components/EmptyState";
+import PublishModal from "../components/integrations/PublishModal";
+import { ListingChips } from "../components/integrations/ChannelChips";
 
 export default function Products() {
   const navigate = useNavigate();
@@ -12,6 +14,9 @@ export default function Products() {
   const [error, setError] = useState("");
   const [pagination, setPagination] = useState({});
   const [selectedProducts, setSelectedProducts] = useState([]);
+
+  // Marketplace publish modal state
+  const [publishProducts, setPublishProducts] = useState(null);
 
   // Share modal state
   const [shareModalOpen, setShareModalOpen] = useState(false);
@@ -290,6 +295,16 @@ export default function Products() {
               Archive
             </button>
             <button
+              onClick={() =>
+                setPublishProducts(
+                  products.filter((p) => selectedProducts.includes(p._id)),
+                )
+              }
+              className="px-4 py-2 min-h-[44px] bg-indigo-600 text-white text-sm font-medium rounded hover:bg-indigo-700 transition"
+            >
+              Publish to marketplace...
+            </button>
+            <button
               onClick={handleBulkDelete}
               className="px-4 py-2 bg-red-600 text-white text-sm font-medium rounded hover:bg-red-700 transition"
             >
@@ -549,6 +564,11 @@ export default function Products() {
                     </td>
                     <td className="px-6 py-4">
                       {getStatusBadge(product.status)}
+                      {product.channelListings?.length > 0 && (
+                        <div className="mt-2 max-w-[200px]">
+                          <ListingChips listings={product.channelListings} />
+                        </div>
+                      )}
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-500">
                       {format(
@@ -636,6 +656,13 @@ export default function Products() {
                           </button>
                         )}
                         <button
+                          onClick={() => setPublishProducts([product])}
+                          className="px-2 py-2 min-h-[44px] text-xs font-medium text-indigo-700 dark:text-indigo-300 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded-lg transition whitespace-nowrap"
+                          title="Publish to a marketplace"
+                        >
+                          Publish to...
+                        </button>
+                        <button
                           onClick={() => handleDelete(product._id)}
                           className="p-2 text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition"
                           title="Delete product"
@@ -697,6 +724,15 @@ export default function Products() {
             </button>
           </div>
         </div>
+      )}
+
+      {publishProducts && (
+        <PublishModal
+          productIds={publishProducts.map((p) => p._id)}
+          products={publishProducts}
+          onClose={() => setPublishProducts(null)}
+          onPublished={loadProducts}
+        />
       )}
 
       {/* Share Modal */}

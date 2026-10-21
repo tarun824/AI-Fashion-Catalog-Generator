@@ -79,6 +79,7 @@ export default function DashboardLayout() {
     { path: "/admin/batch-upload", label: "Batch Upload", icon: "📤" },
     { path: "/admin/search", label: "Search", icon: "🔍" },
     { path: "/admin/integrations", label: "Integrations", icon: "🔌" },
+    { path: "/admin/api-logs", label: "API Logs", icon: "🧾" },
     { path: "/admin/audits", label: "Audit Logs", icon: "📋" },
   ];
 

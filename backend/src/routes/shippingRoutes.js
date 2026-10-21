@@ -7,6 +7,11 @@ import express from "express";
 import { authMiddleware } from "../middleware/auth.js";
 import shiprocketService from "../services/shiprocketService.js";
 import Order from "../models/Order.js";
+import {
+  runWithApiContext,
+  updateApiContext,
+  newCorrelationId,
+} from "../integrations/logging/apiCallContext.js";
 
 const router = express.Router();
 
@@ -14,10 +19,30 @@ const router = express.Router();
 router.use(authMiddleware);
 
 /**
+ * Route-level middleware: runs the rest of the request inside an API-call
+ * logging context so every Shiprocket HTTP call is tied to this operation,
+ * admin and order (orderId from body or params, when present).
+ */
+const apiCtx = (operation) => (req, res, next) => {
+  const orderId = req.body?.orderId || req.params?.orderId;
+  return runWithApiContext(
+    {
+      correlationId: newCorrelationId(),
+      operation,
+      trigger: "manual",
+      triggeredBy: req.admin?._id || undefined,
+      provider: "shiprocket",
+      context: orderId ? { orderId: String(orderId) } : {},
+    },
+    () => next(),
+  );
+};
+
+/**
  * POST /api/admin/shipping/create-order
  * Create order in Shiprocket
  */
-router.post("/create-order", async (req, res) => {
+router.post("/create-order", apiCtx("createOrder"), async (req, res) => {
   try {
     const { orderId, pickupLocation } = req.body;
 
@@ -95,7 +120,7 @@ router.post("/create-order", async (req, res) => {
  * GET /api/admin/shipping/courier-rates/:orderId
  * Get available couriers and rates
  */
-router.get("/courier-rates/:orderId", async (req, res) => {
+router.get("/courier-rates/:orderId", apiCtx("courierRates"), async (req, res) => {
   try {
     const order = await Order.findById(req.params.orderId);
     if (!order) {
@@ -126,7 +151,7 @@ router.get("/courier-rates/:orderId", async (req, res) => {
  * POST /api/admin/shipping/assign-courier
  * Assign courier and generate AWB
  */
-router.post("/assign-courier", async (req, res) => {
+router.post("/assign-courier", apiCtx("assignCourier"), async (req, res) => {
   try {
     const { orderId, courierId } = req.body;
 
@@ -217,7 +242,7 @@ router.post("/assign-courier", async (req, res) => {
  * POST /api/admin/shipping/generate-label
  * Generate shipping label
  */
-router.post("/generate-label", async (req, res) => {
+router.post("/generate-label", apiCtx("generateLabel"), async (req, res) => {
   try {
     const { orderId } = req.body;
 
@@ -262,7 +287,7 @@ router.post("/generate-label", async (req, res) => {
  * POST /api/admin/shipping/schedule-pickup
  * Schedule courier pickup
  */
-router.post("/schedule-pickup", async (req, res) => {
+router.post("/schedule-pickup", apiCtx("schedulePickup"), async (req, res) => {
   try {
     const { orderId, pickupDate } = req.body;
 
@@ -333,7 +358,7 @@ router.post("/schedule-pickup", async (req, res) => {
  * GET /api/admin/shipping/track/:orderId
  * Track shipment
  */
-router.get("/track/:orderId", async (req, res) => {
+router.get("/track/:orderId", apiCtx("track"), async (req, res) => {
   try {
     const order = await Order.findById(req.params.orderId);
     if (!order) {
@@ -363,7 +388,7 @@ router.get("/track/:orderId", async (req, res) => {
  * POST /api/admin/shipping/cancel
  * Cancel shipment
  */
-router.post("/cancel", async (req, res) => {
+router.post("/cancel", apiCtx("cancel"), async (req, res) => {
   try {
     const { orderId } = req.body;
 
@@ -402,7 +427,7 @@ router.post("/cancel", async (req, res) => {
  * POST /api/admin/shipping/one-click-ship
  * Complete shipping flow in one call (auto-select cheapest courier)
  */
-router.post("/one-click-ship", async (req, res) => {
+router.post("/one-click-ship", apiCtx("oneClickShip"), async (req, res) => {
   try {
     const { orderId, pickupLocation } = req.body;
 
@@ -494,7 +519,7 @@ router.post("/one-click-ship", async (req, res) => {
  * POST /api/admin/shipping/bulk-ship
  * Ship multiple orders at once
  */
-router.post("/bulk-ship", async (req, res) => {
+router.post("/bulk-ship", apiCtx("bulkShip"), async (req, res) => {
   try {
     const { orderIds, pickupLocation } = req.body;
 
@@ -506,6 +531,7 @@ router.post("/bulk-ship", async (req, res) => {
     const errors = [];
 
     for (const orderId of orderIds) {
+      updateApiContext({ context: { orderId: String(orderId) } });
       try {
         const order = await Order.findById(orderId).populate("customer");
         if (!order) {
@@ -581,7 +607,7 @@ router.post("/bulk-ship", async (req, res) => {
  * GET /api/admin/shipping/pickup-locations
  * Get list of configured pickup locations from Shiprocket
  */
-router.get("/pickup-locations", async (req, res) => {
+router.get("/pickup-locations", apiCtx("pickupLocations"), async (req, res) => {
   try {
     const result = await shiprocketService.getPickupLocations();
     res.json(result);

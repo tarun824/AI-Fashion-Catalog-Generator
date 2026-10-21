@@ -1,0 +1,37 @@
+{
+  "order": {
+    "AmazonOrderId": "404-0000000-0000001",
+    "PurchaseDate": "2026-09-28T10:15:00Z",
+    "LastUpdateDate": "2026-09-28T10:20:00Z",
+    "OrderStatus": "Unshipped",
+    "FulfillmentChannel": "MFN",
+    "PaymentMethod": "Other",
+    "PaymentMethodDetails": ["Standard"],
+    "MarketplaceId": "A21TJRUUN4KGV",
+    "LatestShipDate": "2026-09-30T18:29:59Z",
+    "OrderTotal": { "CurrencyCode": "INR", "Amount": "2498.00" }
+  },
+  "items": [
+    {
+      "ASIN": "B0TESTASIN1",
+      "OrderItemId": "10000000000001",
+      "SellerSKU": "SAREE-RED-001",
+      "Title": "Red Silk Saree",
+      "QuantityOrdered": 2,
+      "QuantityShipped": 0,
+      "ItemPrice": { "CurrencyCode": "INR", "Amount": "2398.00" },
+      "ShippingPrice": { "CurrencyCode": "INR", "Amount": "100.00" },
+      "PromotionDiscount": { "CurrencyCode": "INR", "Amount": "0.00" }
+    }
+  ],
+  "address": {
+    "Name": "Test Buyer",
+    "AddressLine1": "1 Example Street",
+    "AddressLine2": "Near Test Market",
+    "City": "Bengaluru",
+    "StateOrRegion": "Karnataka",
+    "PostalCode": "560001",
+    "CountryCode": "IN",
+    "Phone": "9999999999"
+  }
+}

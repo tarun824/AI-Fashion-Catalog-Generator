@@ -12,12 +12,133 @@
 
 import shiprocketService from "./shiprocketService.js";
 import Integration from "../models/Integration.js";
+import Product from "../models/Product.js";
+import registry from "../integrations/core/registry.js";
+import { listDocsAvailability } from "../integrations/core/docsLoader.js";
+import { ProviderError } from "../integrations/core/errors.js";
+import {
+  requireCredentials,
+  missingRequired,
+  getProviderOrThrow,
+  assertCapability,
+} from "../integrations/services/credentialStore.js";
+import { importOrders } from "../integrations/services/orderImportService.js";
+import {
+  runWithApiContext,
+  getApiContext,
+  updateApiContext,
+} from "../integrations/logging/apiCallContext.js";
+
+const MAX_FETCH_PAGES = 20;
+const DEFAULT_LOOKBACK_MS = 7 * 24 * 60 * 60 * 1000;
 
 class IntegrationService {
   /**
    * Get all available integrations with their status
    */
   async getAllIntegrations() {
+    const legacy = await this.getLegacyIntegrations();
+    const merged = [];
+    const seen = new Set();
+    for (const entry of legacy) {
+      const provider = registry.get(entry.id);
+      seen.add(entry.id);
+      merged.push(
+        provider ? await this.buildRegistryEntry(provider, entry) : entry,
+      );
+    }
+    // Providers registered but without a legacy static entry
+    for (const provider of registry.list()) {
+      if (!seen.has(provider.id)) {
+        merged.push(await this.buildRegistryEntry(provider, null));
+      }
+    }
+    const docsMap = new Map(
+      listDocsAvailability().map((d) => [d.providerId, d.hasDocs]),
+    );
+    for (const entry of merged) {
+      if (registry.has(entry.id)) entry.hasDocs = !!docsMap.get(entry.id);
+    }
+    return merged;
+  }
+
+  /**
+   * True when the provider keeps credentials in the encrypted store
+   * (has credential fields). Env-based providers (Shiprocket) use legacy paths.
+   */
+  usesStoredCredentials(provider) {
+    return !!provider && provider.credentialFields().length > 0;
+  }
+
+  /**
+   * Merge registry metadata over a legacy static entry (legacy fields preserved
+   * so the existing frontend keeps working).
+   */
+  async buildRegistryEntry(provider, legacyEntry) {
+    const C = provider.constructor;
+    const base = legacyEntry || {
+      id: provider.id,
+      name: provider.displayName,
+      category: provider.category,
+      description: C.description || "",
+      logo: C.logo || "",
+      features: C.features || [],
+      docsUrl: C.docsUrl || "",
+      webhookUrl: this.getWebhookUrl(provider.id),
+      enabled: false,
+      configured: false,
+      status: {
+        connected: false,
+        message: "Not configured",
+        lastChecked: new Date().toISOString(),
+      },
+    };
+    const entry = {
+      ...base,
+      category: provider.category || base.category,
+      capabilities: provider.capabilities,
+      hasCredentialFields: this.usesStoredCredentials(provider),
+      lastSyncAt: null,
+      lastSyncCorrelationId: null,
+    };
+
+    try {
+      const doc = await Integration.findWithCredentials(provider.id);
+      entry.lastSyncAt = doc?.lastSyncAt || null;
+      entry.lastSyncCorrelationId = doc?.lastSyncCorrelationId || null;
+      if (this.usesStoredCredentials(provider)) {
+        const hasCreds = !!doc?.hasCredentials();
+        entry.configured = hasCreds;
+        entry.enabled = hasCreds && !!doc?.config?.enabled;
+        let message = "Not configured";
+        if (hasCreds) {
+          if (doc.status === "active") message = "Connected successfully";
+          else if (doc.status === "error")
+            message = doc.lastError?.message || "Last request failed";
+          else message = "Credentials saved. Run Test connection.";
+        }
+        entry.status = {
+          connected: hasCreds && doc.status === "active",
+          message,
+          lastChecked: new Date().toISOString(),
+          stats: doc
+            ? {
+                totalRequests: doc.stats.totalRequests,
+                lastRequestAt: doc.stats.lastRequestAt,
+              }
+            : undefined,
+        };
+      }
+    } catch (error) {
+      console.warn(
+        `[Integration:${provider.id}] status lookup failed reason=${error.message}`,
+      );
+    }
+    return entry;
+  }
+
+  /** Static entries kept as before so nothing disappears from the UI. */
+  async getLegacyIntegrations() {
     const integrations = [
       {
         id: "shiprocket",
@@ -135,6 +256,10 @@ class IntegrationService {
    * Test integration connection
    */
   async testIntegration(integrationId) {
+    const provider = registry.get(integrationId);
+    if (this.usesStoredCredentials(provider)) {
+      return await this.testRegistryIntegration(integrationId);
+    }
     switch (integrationId) {
       case "shiprocket":
         return await this.testShiprocket();
@@ -403,6 +528,325 @@ class IntegrationService {
       success: true,
       message: "WhatsApp configuration found (API test not implemented)",
     };
+  }
+
+  // ==================== REGISTRY-BASED OPERATIONS ====================
+
+  getCredentialFields(id) {
+    const provider = getProviderOrThrow(id);
+    return provider.credentialFields().map((f) => ({
+      key: f.key,
+      label: f.label,
+      secret: !!f.secret,
+      required: !!f.required,
+      help: f.help || "",
+    }));
+  }
+
+  async saveCredentials(id, values, ownerId) {
+    const provider = getProviderOrThrow(id);
+    if (!this.usesStoredCredentials(provider)) {
+      throw new ProviderError(
+        "UNSUPPORTED",
+        `${provider.displayName} credentials are managed via server environment`,
+      );
+    }
+    if (!values || typeof values !== "object" || Array.isArray(values)) {
+      throw new ProviderError("VALIDATION", "credentials must be an object");
+    }
+    const allowed = new Set(provider.credentialFields().map((f) => f.key));
+    const clean = {};
+    for (const [k, v] of Object.entries(values)) {
+      if (!allowed.has(k)) {
+        console.warn(`[Integration:${id}] ignored unknown credential key=${k}`);
+        continue;
+      }
+      if (v != null && String(v).trim() !== "") clean[k] = String(v).trim();
+    }
+    let integration = await Integration.findWithCredentials(id);
+    if (!integration) {
+      await Integration.getOrCreate(
+        id,
+        provider.displayName,
+        provider.category === "shipping" ? "shipping" : "marketplace",
+      );
+      integration = await Integration.findWithCredentials(id);
+    }
+    // Merge with existing so a secret left blank in the form is kept
+    let existing = {};
+    if (integration.hasCredentials()) {
+      try {
+        existing = integration.getCredentials();
+      } catch (err) {
+        console.warn(
+          `[Integration:${id}] existing credentials unreadable, replacing reason=${err.message}`,
+        );
+      }
+    }
+    const next = { ...existing, ...clean };
+    const missing = missingRequired(provider, next);
+    if (missing.length) {
+      throw new ProviderError("VALIDATION", "Missing required credentials", {
+        details: { missing },
+        actionRequired: `Fill in: ${missing.join(", ")}`,
+      });
+    }
+    integration.setCredentials(next);
+    integration.status = "pending";
+    integration.token = { value: "", expiresAt: null, generatedAt: null };
+    await integration.save();
+    console.log(
+      `[Integration:${id}] credentials saved ownerId=${ownerId || ""} keys=${Object.keys(next).join(",")}`,
+    );
+    return integration.getMaskedCredentials();
+  }
+
+  async deleteCredentials(id, ownerId) {
+    getProviderOrThrow(id);
+    const integration = await Integration.findWithCredentials(id);
+    if (!integration) {
+      console.warn(
+        `[Integration:${id}] deleteCredentials: no integration doc ownerId=${ownerId || ""}`,
+      );
+      return false;
+    }
+    integration.credentialsEnc = "";
+    integration.credentialsUpdatedAt = null;
+    integration.token = { value: "", expiresAt: null, generatedAt: null };
+    integration.status = "inactive";
+    integration.config.enabled = false;
+    await integration.save();
+    console.log(
+      `[Integration:${id}] credentials deleted ownerId=${ownerId || ""}`,
+    );
+    return true;
+  }
+
+  async getMaskedCredentials(id) {
+    getProviderOrThrow(id);
+    const integration = await Integration.findWithCredentials(id);
+    if (!integration?.hasCredentials()) return {};
+    return integration.getMaskedCredentials();
+  }
+
+  /** Registry test; returns legacy shape {success,message,data}. */
+  async testRegistryIntegration(id) {
+    const provider = getProviderOrThrow(id);
+    const { integration, credentials } = await requireCredentials(id);
+    try {
+      const result = await provider.testConnection(credentials);
+      if (result?.ok) {
+        integration.status = "active";
+        integration.config.enabled = true;
+        integration.setupCompletedAt =
+          integration.setupCompletedAt || new Date();
+        await integration.save();
+        await integration.recordSuccess();
+      } else {
+        await integration.recordFailure(
+          result?.message || "Connection test failed",
+          "TEST_FAILED",
+        );
+      }
+      return {
+        success: !!result?.ok,
+        message: result?.message || "",
+        data: undefined,
+      };
+    } catch (err) {
+      await integration.recordFailure(err.message, err.type || "TEST_FAILED");
+      throw err;
+    }
+  }
+
+  /**
+   * Fetch orders from one provider (paged, capped) and import them.
+   * @returns {Promise<{imported,updated,skipped,needsMapping,warnings,fetched,pages}>}
+   */
+  async fetchOrdersFor(id, { since } = {}, ownerId) {
+    const provider = getProviderOrThrow(id);
+    assertCapability(provider, "fetchOrders");
+    const { integration, credentials } = await requireCredentials(id);
+
+    let sinceDate = since ? new Date(since) : integration.lastSyncAt;
+    if (since && Number.isNaN(sinceDate.getTime())) {
+      throw new ProviderError("VALIDATION", "since must be a valid date");
+    }
+    if (!sinceDate) sinceDate = new Date(Date.now() - DEFAULT_LOOKBACK_MS);
+
+    const startedAt = new Date();
+    const syncCorrelationId = getApiContext()?.correlationId || null;
+    const warnings = [];
+    const orders = [];
+    let cursor = null;
+    let pages = 0;
+    try {
+      do {
+        const page = await provider.fetchOrders(credentials, {
+          since: sinceDate,
+          cursor,
+          limit: 50,
+        });
+        pages++;
+        orders.push(...(page?.orders || []));
+        warnings.push(...(page?.warnings || []));
+        cursor = page?.cursor || null;
+      } while (cursor && pages < MAX_FETCH_PAGES);
+      if (cursor) {
+        const msg = `Stopped after ${MAX_FETCH_PAGES} pages; more orders remain. Run fetch again.`;
+        console.warn(`[Integration:${id}] ${msg}`);
+        warnings.push(msg);
+      }
+      const summary = await importOrders({
+        providerId: id,
+        normalizedOrders: orders,
+        ownerId,
+      });
+      // Only advance the sync cursor when everything was fetched
+      if (!cursor) integration.lastSyncAt = startedAt;
+      integration.lastSyncCorrelationId = syncCorrelationId;
+      await integration.save();
+      await integration.recordSuccess();
+      return {
+        ...summary,
+        warnings: [...warnings, ...summary.warnings],
+        fetched: orders.length,
+        pages,
+      };
+    } catch (err) {
+      integration.lastSyncCorrelationId = syncCorrelationId;
+      await integration
+        .save()
+        .catch((e) =>
+          console.warn(
+            `[Integration:${id}] could not persist lastSyncCorrelationId correlationId=${syncCorrelationId} reason=${e.message}`,
+          ),
+        );
+      await integration
+        .recordFailure(err.message, err.type || "FETCH_FAILED")
+        .catch((e) =>
+          console.warn(
+            `[Integration:${id}] could not record failure reason=${e.message}`,
+          ),
+        );
+      throw err;
+    }
+  }
+
+  /** Fetch from every connected provider that supports fetchOrders. */
+  async fetchAll({ since } = {}, ownerId) {
+    const results = {};
+    for (const provider of registry.list()) {
+      if (!provider.capabilities.fetchOrders) continue;
+      const doc = await Integration.findWithCredentials(provider.id);
+      if (!doc?.hasCredentials()) {
+        console.warn(
+          `[Integration:${provider.id}] fetch-all skipped reason=not connected`,
+        );
+        results[provider.id] = { skipped: true, reason: "Not connected" };
+        continue;
+      }
+      try {
+        const parentCtx = getApiContext() || {};
+        const summary = await runWithApiContext(
+          { ...parentCtx, provider: provider.id, operation: "fetchOrders" },
+          () => this.fetchOrdersFor(provider.id, { since }, ownerId),
+        );
+        results[provider.id] = {
+          ok: true,
+          ...summary,
+          correlationId: parentCtx.correlationId,
+        };
+      } catch (err) {
+        console.warn(
+          `[Integration:${provider.id}] fetch-all failed type=${err.type || "ERROR"} reason=${err.message}`,
+        );
+        results[provider.id] = {
+          ok: false,
+          error: err.message,
+          errorType: err.type || "UPSTREAM_ERROR",
+          actionRequired: err.actionRequired,
+          correlationId: getApiContext()?.correlationId,
+        };
+      }
+    }
+    return results;
+  }
+
+  /** Resolve the channel SKU from externalSku or productId. */
+  async resolveChannelSku(id, { productId, externalSku }) {
+    if (externalSku) return { externalSku, product: null };
+    if (!productId) {
+      throw new ProviderError(
+        "VALIDATION",
+        "externalSku or productId is required",
+      );
+    }
+    const product = await Product.findOne({ _id: productId, deletedAt: null });
+    if (!product) {
+      throw new ProviderError("VALIDATION", "Product not found", {
+        status: 404,
+      });
+    }
+    const listing = product.channelListings.find((l) => l.channel === id);
+    if (!listing?.externalSku) {
+      throw new ProviderError(
+        "MAPPING_REQUIRED",
+        "Product is not linked to this marketplace",
+        { details: { productId } },
+      );
+    }
+    return { externalSku: listing.externalSku, product };
+  }
+
+  async pushInventory(id, body = {}) {
+    const provider = getProviderOrThrow(id);
+    assertCapability(provider, "updateInventory");
+    const { credentials } = await requireCredentials(id);
+    const { externalSku, product } = await this.resolveChannelSku(id, body);
+    updateApiContext({
+      context: { productId: product ? String(product._id) : body.productId, sku: externalSku },
+    });
+    let quantity = body.quantity;
+    if (quantity == null && product) {
+      quantity = (product.variants || []).reduce(
+        (s, v) => s + (v.stock || 0),
+        0,
+      );
+    }
+    if (!Number.isInteger(quantity) || quantity < 0) {
+      throw new ProviderError(
+        "VALIDATION",
+        "quantity must be a non-negative integer",
+      );
+    }
+    return provider.updateInventory(credentials, { externalSku, quantity });
+  }
+
+  async pushPrice(id, body = {}) {
+    const provider = getProviderOrThrow(id);
+    assertCapability(provider, "updatePrice");
+    const { credentials } = await requireCredentials(id);
+    const { externalSku, product } = await this.resolveChannelSku(id, body);
+    updateApiContext({
+      context: { productId: product ? String(product._id) : body.productId, sku: externalSku },
+    });
+    let { mrp, sellingPrice } = body;
+    if (product) {
+      sellingPrice = sellingPrice ?? product.price?.amount;
+      mrp = mrp ?? product.price?.suggested ?? product.price?.amount;
+    }
+    if (typeof sellingPrice !== "number" || sellingPrice < 0) {
+      throw new ProviderError(
+        "VALIDATION",
+        "sellingPrice must be a non-negative number",
+      );
+    }
+    return provider.updatePrice(credentials, {
+      externalSku,
+      mrp,
+      sellingPrice,
+    });
   }
 
   /**

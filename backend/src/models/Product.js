@@ -348,6 +348,25 @@ const productSchema = new Schema(
       default: null,
     },
 
+    // Marketplace listings (Amazon/Flipkart/...) linked to this product
+    channelListings: {
+      type: [
+        {
+          channel: { type: String, required: true, trim: true },
+          externalId: { type: String, default: "" }, // ASIN / Flipkart listingId
+          externalSku: { type: String, default: "", trim: true },
+          status: {
+            type: String,
+            enum: ["draft", "submitted", "live", "error"],
+            default: "draft",
+          },
+          issues: { type: [String], default: [] },
+          lastSyncedAt: { type: Date, default: null },
+        },
+      ],
+      default: [],
+    },
+
     // Merge history - tracks products that were merged into this one
     mergeHistory: [
       {
@@ -392,6 +411,10 @@ const productSchema = new Schema(
 productSchema.index({ status: 1, createdAt: -1 });
 productSchema.index({ status: 1, publishedAt: -1 });
 productSchema.index({ "categories.categoryId": 1, status: 1 });
+productSchema.index({
+  "channelListings.channel": 1,
+  "channelListings.externalSku": 1,
+});
 // Note: slug index removed - already defined with unique: true inline
 
 // Helper: Generate short random code for slug uniqueness

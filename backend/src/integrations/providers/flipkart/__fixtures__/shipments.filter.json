@@ -1,0 +1,31 @@
+{
+  "hasMore": true,
+  "nextPageUrl": "/sellers/v3/shipments/filter?cursor=abc",
+  "shipments": [
+    {
+      "shipmentId": "SHP0001",
+      "locationId": "LOC_TEST",
+      "dispatchByDate": "2026-10-05T12:00:00.000Z",
+      "orderItems": [
+        { "orderItemId": "OI1", "orderId": "OD000000000000000001", "status": "APPROVED", "quantity": 1, "sku": "SAREE-RED-001", "title": "Red Silk Saree", "orderDate": "2026-10-02T08:30:00.000Z", "hold": false, "serviceProfile": "NON_FBF",
+          "priceComponents": { "sellingPrice": 1500, "shippingCharge": 50, "customerPrice": 1550, "totalPrice": 1500 } },
+        { "orderItemId": "OI2", "orderId": "OD000000000000000001", "status": "APPROVED", "quantity": 2, "sku": "SAREE-BLU-002", "title": "Blue Cotton Saree", "orderDate": "2026-10-02T08:30:00.000Z", "hold": true, "serviceProfile": "NON_FBF",
+          "priceComponents": { "sellingPrice": 500, "shippingCharge": 0, "customerPrice": 1000, "totalPrice": 1000 } }
+      ]
+    },
+    {
+      "shipmentId": "SHP0002",
+      "orderItems": [
+        { "orderItemId": "OI3", "orderId": "OD000000000000000002", "status": "READY_TO_DISPATCH", "quantity": 1, "sku": "FBF-SKU-9", "title": "Fulfilled by Flipkart item", "orderDate": 1759400000000, "serviceProfile": "FBF_LITE",
+          "priceComponents": { "sellingPrice": 999, "shippingCharge": 0, "customerPrice": 999 } }
+      ]
+    },
+    {
+      "shipmentId": "SHP0003",
+      "orderItems": [
+        { "orderItemId": "OI4", "orderId": "OD000000000000000003", "status": "CANCELLED", "quantity": 1, "sku": "SAREE-GRN-003", "title": "Green Saree", "orderDate": "2026-10-01T10:00:00.000Z",
+          "priceComponents": { "sellingPrice": 3000, "shippingCharge": 0, "customerPrice": 3000 } }
+      ]
+    }
+  ]
+}

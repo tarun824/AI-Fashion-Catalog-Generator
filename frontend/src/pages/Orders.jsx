@@ -4,8 +4,20 @@ import { api } from "../utils/api";
 import OrderStatusBadge from "../components/OrderStatusBadge";
 import { format } from "date-fns";
 import EmptyState from "../components/EmptyState";
+import { formatErrorMessage, logApiError } from "../utils/errorHandler";
+import { useToast } from "../contexts/ToastContext";
+import { summarizeFetchAll } from "../utils/integrationHelpers";
+import FetchSummary from "../components/integrations/FetchSummary";
+import {
+  SourceBadge,
+  MarketplaceOrderChips,
+} from "../components/integrations/ChannelChips";
+import { dispatchState } from "../utils/channelHelpers";
 
 export default function Orders() {
+  const toast = useToast();
+  const [fetchingAll, setFetchingAll] = useState(false);
+  const [fetchResults, setFetchResults] = useState(null);
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -116,6 +128,22 @@ export default function Orders() {
     }
   };
 
+  const handleFetchAll = async () => {
+    setFetchingAll(true);
+    try {
+      const res = await api.post("/admin/integrations/fetch-all", {});
+      setFetchResults(res.results || {});
+      const { message, tone } = summarizeFetchAll(res.results);
+      toast[tone](message, 7000);
+      await Promise.all([loadOrders(), loadStats()]);
+    } catch (err) {
+      logApiError("Fetch marketplace orders", err);
+      toast.error(formatErrorMessage(err), 8000);
+    } finally {
+      setFetchingAll(false);
+    }
+  };
+
   const handleSearch = (e) => {
     e.preventDefault();
     setPage(1);
@@ -178,13 +206,33 @@ export default function Orders() {
             Manage and track all customer orders
           </p>
         </div>
-        <Link
-          to="/admin/orders/create"
-          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 text-white rounded-lg transition"
-        >
-          + Create Order
-        </Link>
+        <div className="flex flex-wrap gap-2 justify-end">
+          <button
+            type="button"
+            onClick={handleFetchAll}
+            disabled={fetchingAll}
+            className="min-h-[44px] px-4 py-2 bg-white dark:bg-gray-800 border-2 border-blue-600 dark:border-blue-400 text-blue-700 dark:text-blue-300 hover:bg-blue-50 dark:hover:bg-gray-700 rounded-lg font-medium transition disabled:opacity-50 flex items-center gap-2"
+          >
+            {fetchingAll && (
+              <span className="inline-block w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+            )}
+            {fetchingAll ? "Fetching orders..." : "Fetch orders"}
+          </button>
+          <Link
+            to="/admin/orders/create"
+            className="min-h-[44px] inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 text-white rounded-lg transition"
+          >
+            + Create Order
+          </Link>
+        </div>
       </div>
+
+      {fetchResults && (
+        <FetchSummary
+          results={fetchResults}
+          onDismiss={() => setFetchResults(null)}
+        />
+      )}
 
       {/* Statistics Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -268,7 +316,7 @@ export default function Orders() {
             <select
               value={sourceFilter}
               onChange={(e) => setSourceFilter(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+              className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
             >
               <option value="all">All Sources</option>
               <option value="website">Website</option>
@@ -276,6 +324,11 @@ export default function Orders() {
               <option value="phone">Phone</option>
               <option value="email">Email</option>
               <option value="manual">Manual</option>
+              <option value="amazon">Amazon</option>
+              <option value="flipkart">Flipkart</option>
+              <option value="shopify">Shopify</option>
+              <option value="myntra">Myntra</option>
+              <option value="meesho">Meesho</option>
             </select>
             <input
               type="date"
@@ -435,6 +488,9 @@ export default function Orders() {
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Date
                     </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Dispatch by
+                    </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider sticky right-0 z-10 bg-gray-50 dark:bg-gray-900 shadow-[-2px_0_4px_rgba(0,0,0,0.05)]">
                       Actions
                     </th>
@@ -458,6 +514,16 @@ export default function Orders() {
                         >
                           {order.orderNumber}
                         </Link>
+                        {order.source && order.source !== "manual" && (
+                          <div className="mt-1">
+                            <SourceBadge source={order.source} />
+                          </div>
+                        )}
+                        {order.marketplace?.channel && (
+                          <div className="mt-1 max-w-[220px] whitespace-normal">
+                            <MarketplaceOrderChips order={order} />
+                          </div>
+                        )}
                       </td>
                       <td className="px-6 py-4">
                         <div className="text-sm font-medium text-gray-900">
@@ -531,6 +597,9 @@ export default function Orders() {
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {format(new Date(order.createdAt), "MMM d, yyyy")}
                       </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm">
+                        <DispatchBy order={order} />
+                      </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm sticky right-0 z-10 bg-white dark:bg-gray-800 shadow-[-2px_0_4px_rgba(0,0,0,0.05)]">
                         <Link
                           to={`/admin/orders/${order._id}`}
@@ -538,7 +607,13 @@ export default function Orders() {
                         >
                           View
                         </Link>
-                        {!order.shipping?.awbCode &&
+                        {order.marketplace?.fulfillmentType === "MARKETPLACE" && (
+                          <span className="text-gray-500 dark:text-gray-400">
+                            Marketplace ships
+                          </span>
+                        )}
+                        {order.marketplace?.fulfillmentType !== "MARKETPLACE" &&
+                          !order.shipping?.awbCode &&
                           order.status !== "cancelled" &&
                           order.status !== "delivered" && (
                             <Link
@@ -589,5 +664,37 @@ export default function Orders() {
         )}
       </div>
     </div>
+  );
+}
+
+/** Dispatch-by cell: red when overdue, amber when due today. */
+function DispatchBy({ order }) {
+  const m = order.marketplace;
+  const state = dispatchState(m?.dispatchByDate);
+  if (!m?.channel || !state) {
+    return <span className="text-gray-400 dark:text-gray-500">-</span>;
+  }
+  // Nothing left to dispatch once shipped/delivered/cancelled or marketplace ships it
+  const settled =
+    ["shipped", "delivered", "cancelled", "returned"].includes(order.status) ||
+    order.shipping?.awbCode ||
+    m.fulfillmentType === "MARKETPLACE";
+  const tone = settled ? "ok" : state.tone;
+  const styles = {
+    overdue:
+      "bg-red-100 text-red-900 border-red-300 dark:bg-red-900/40 dark:text-red-200 dark:border-red-700",
+    today:
+      "bg-amber-100 text-amber-900 border-amber-300 dark:bg-amber-900/40 dark:text-amber-200 dark:border-amber-700",
+    ok: "text-gray-600 dark:text-gray-400 border-transparent",
+  };
+  const label =
+    tone === "overdue" ? "Overdue" : tone === "today" ? "Due today" : "";
+  return (
+    <span
+      className={`inline-flex flex-col px-2 py-1 rounded-lg border ${styles[tone]}`}
+    >
+      <span className="font-medium">{format(state.date, "MMM d, h:mm a")}</span>
+      {label && <span className="text-xs font-semibold">{label}</span>}
+    </span>
   );
 }

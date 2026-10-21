@@ -7,6 +7,11 @@
  */
 
 import mongoose from "mongoose";
+import {
+  encryptObject,
+  decryptObject,
+  maskObject,
+} from "../integrations/core/credentialVault.js";
 
 const integrationSchema = new mongoose.Schema(
   {
@@ -21,6 +26,7 @@ const integrationSchema = new mongoose.Schema(
         "whatsapp",
         "amazon",
         "flipkart",
+        "shopify",
         "myntra",
         "meesho",
         "phonepe",
@@ -58,6 +64,11 @@ const integrationSchema = new mongoose.Schema(
       merchantId: { type: String, default: "" },
       sellerId: { type: String, default: "" },
     },
+
+    // Encrypted credential blob (AES-256-GCM, see credentialVault). Preferred over
+    // the legacy plaintext `credentials` fields above, which are no longer written.
+    credentialsEnc: { type: String, default: "", select: false },
+    credentialsUpdatedAt: { type: Date, default: null },
 
     // Authentication token storage
     token: {
@@ -102,6 +113,8 @@ const integrationSchema = new mongoose.Schema(
     notes: { type: String, default: "" },
     setupCompletedAt: { type: Date, default: null },
     lastSyncAt: { type: Date, default: null },
+    // correlationId of the most recent order fetch (success or failure) - see ExternalApiCall
+    lastSyncCorrelationId: { type: String, default: null },
   },
   {
     timestamps: true,
@@ -192,6 +205,42 @@ integrationSchema.methods.getData = function (key, defaultValue = null) {
 };
 
 /**
+ * Encrypt and store credentials (replaces the whole set).
+ * Caller must save() afterwards (or use setCredentialsAndSave).
+ * @param {Object} plainObj
+ */
+integrationSchema.methods.setCredentials = function (plainObj) {
+  this.credentialsEnc = encryptObject(plainObj || {});
+  this.credentialsUpdatedAt = new Date();
+  return this;
+};
+
+/**
+ * Decrypt stored credentials. Requires credentialsEnc to be loaded
+ * (query with .select("+credentialsEnc")). Returns {} when none stored.
+ */
+integrationSchema.methods.getCredentials = function () {
+  if (!this.credentialsEnc) {
+    console.warn(
+      `[Integration:${this.name}] getCredentials: no credentialsEnc loaded (not saved, or query missing +credentialsEnc)`,
+    );
+    return {};
+  }
+  return decryptObject(this.credentialsEnc);
+};
+
+/**
+ * Masked view: { key: { hasValue, last4 } }
+ */
+integrationSchema.methods.getMaskedCredentials = function () {
+  return maskObject(this.getCredentials());
+};
+
+integrationSchema.methods.hasCredentials = function () {
+  return !!this.credentialsEnc;
+};
+
+/**
  * Mark integration as active
  */
 integrationSchema.methods.activate = function () {
@@ -237,6 +286,13 @@ integrationSchema.statics.getOrCreate = async function (
 /**
  * Get active integrations by category
  */
+/**
+ * Load an integration including its encrypted credentials blob.
+ */
+integrationSchema.statics.findWithCredentials = function (name) {
+  return this.findOne({ name }).select("+credentialsEnc");
+};
+
 integrationSchema.statics.getActiveByCategory = function (category) {
   return this.find({
     category,

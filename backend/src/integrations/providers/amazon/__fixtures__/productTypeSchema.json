@@ -1,0 +1,11 @@
+{
+  "required": ["item_name", "brand", "bullet_point", "color", "country_of_origin", "hsn_code"],
+  "properties": {
+    "item_name": {}, "brand": {}, "bullet_point": {}, "product_description": {},
+    "color": {}, "size": {}, "material": {}, "department": {}, "country_of_origin": {},
+    "condition_type": {}, "supplier_declared_has_product_identifier_exemption": {},
+    "purchasable_offer": {}, "list_price": {}, "fulfillment_availability": {},
+    "main_product_image_locator": {}, "other_product_image_locator_1": {},
+    "hsn_code": {}
+  }
+}

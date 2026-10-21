@@ -1,0 +1,26 @@
+{
+  "sku": "SAREE-RED-001",
+  "name": "Red Silk Saree",
+  "description": "Handwoven red silk saree with zari border.",
+  "mrp": 3999,
+  "sellingPrice": 1199,
+  "currency": "INR",
+  "images": [
+    "https://example.com/api/images/a1",
+    "https://example.com/api/images/a2",
+    "https://example.com/api/images/a3"
+  ],
+  "attributes": {
+    "fabric": "Silk",
+    "colors": ["Red"],
+    "occasion": "Wedding",
+    "workType": "Zari",
+    "borderType": "Zari border",
+    "blouseIncluded": true,
+    "weight": "600 g"
+  },
+  "stock": 7,
+  "variants": [{ "size": "Free Size", "color": "Red", "sku": "SAREE-RED-001", "stock": 7 }],
+  "category": "Sarees",
+  "overrides": {}
+}

@@ -1,0 +1,16 @@
+{
+  "shipments": [
+    {
+      "shipmentId": "SHP0001",
+      "paymentType": "COD",
+      "buyerDetails": { "firstName": "Test", "lastName": "Buyer" },
+      "deliveryAddress": { "firstName": "Test", "lastName": "Receiver", "contactNumber": "9000000000", "addressLine1": "1 Sample Street", "addressLine2": "Sample Area", "city": "Testville", "state": "Karnataka", "pinCode": "560001" },
+      "orderItems": [ { "orderItemId": "OI1", "title": "Red Silk Saree (detail)" } ]
+    },
+    {
+      "shipmentId": "SHP0002",
+      "buyerDetails": { "firstName": "Fbf", "lastName": "Buyer" },
+      "deliveryAddress": { "name": "Fbf Buyer", "contactNumber": "9000000001", "addressLine1": "2 Sample Road", "city": "Testville", "state": "Kerala", "pinCode": "682001" }
+    }
+  ]
+}
